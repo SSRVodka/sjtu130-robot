@@ -1,0 +1,52 @@
+robot:
+  host: "192.168.1.100"   # Replace with robot's actual IP
+  nav_poll_interval: 1.0  # seconds between navigation status polls
+  nav_timeout: 120        # seconds before navigation is considered failed
+
+tour:
+  # If true, operator must press Enter (or hardware button) before moving to next stop.
+  # If false, the robot proceeds automatically after dwell_time expires.
+  wait_for_input: true
+  input_mode: "cli"       # "cli" | "button"
+  # Only relevant when input_mode = "button":
+  button_device: "/dev/input/event0"
+  button_event_code: 272  # BTN_LEFT (mouse left-click) — see linux/input-event-codes.h
+
+waypoints:
+  - name: "Lobby Welcome"
+    # Use either 'point' (named waypoint on the robot's map) or 'pose' (raw coordinates).
+    point: "lobby"
+    dwell_time: 20          # seconds to stay after arriving (ignored if wait_for_input)
+    audio_file: "audio/01_lobby_welcome.mp3"
+    actions:
+      - greet               # stub: wave / play greeting animation
+
+  - name: "Ancient Civilizations Hall"
+    point: "hall_ancient"
+    dwell_time: 45
+    audio_file: "audio/02_ancient_civilizations.mp3"
+    actions: []
+
+  - name: "Medieval Gallery"
+    # Raw pose example (x, y in map pixels; theta in radians)
+    pose:
+      x: 285
+      y: 410
+      theta: 1.57
+    dwell_time: 40
+    audio_file: "audio/03_medieval_gallery.mp3"
+    actions:
+      - display_artifact    # stub: trigger an external display/projector
+
+  - name: "Modern Art Wing"
+    point: "modern_art"
+    dwell_time: 35
+    audio_file: "audio/04_modern_art.mp3"
+    actions: []
+
+  - name: "Exit & Gift Shop"
+    point: "exit"
+    dwell_time: 15
+    audio_file: "audio/05_exit.mp3"
+    actions:
+      - farewell            # stub: farewell gesture
