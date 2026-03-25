@@ -175,6 +175,10 @@ class TourController:
             logger.error("Failed to send navigation command for '%s'.", waypoint.name)
             return False
 
+        logger.info("Waiting for server to get ready for navigation status...")
+        # NOTE: do NOT remove it. REEMAN server needs time to get ready for navigation status.
+        time.sleep(5)
+        logger.info("Waiting for arrival...")
         return self.client.wait_for_arrival(
             poll_interval=robot_cfg.nav_poll_interval,
             timeout=robot_cfg.nav_timeout,

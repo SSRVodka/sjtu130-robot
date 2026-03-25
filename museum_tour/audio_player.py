@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 def _find_player() -> Optional[str]:
     """Return the first available command-line audio player found on PATH."""
     candidates = {
-        "Linux": ["mpg123", "mpg321", "aplay", "ffplay", "cvlc"],
+        "Linux": ["aplay", "mpg123", "mpg321", "ffplay", "cvlc"],
         "Darwin": ["afplay", "mpg123", "ffplay"],
         "Windows": ["ffplay"],
     }
@@ -88,6 +88,9 @@ class AudioPlayer:
         assert _PLAYER_CMD is not None
         cmd = _PLAYER_CMD
         file_str = str(self.audio_file)
+        # use source card 1 on OrangePi5 Plus (OpenHarmony OS)
+        if cmd == "aplay":
+            return ["aplay", "-Dplughw:1", file_str]
         # ffplay needs extra flags to suppress its video window
         if cmd == "ffplay":
             return ["ffplay", "-nodisp", "-autoexit", file_str]
