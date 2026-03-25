@@ -29,6 +29,7 @@ class Waypoint:
     name: str
     dwell_time: float          # seconds
     audio_file: str
+    play_audio_when_walking: bool = False
     actions: List[str] = field(default_factory=list)
     point: Optional[str] = None   # named point on robot map
     pose: Optional[Pose] = None   # raw coordinate fallback
@@ -107,6 +108,7 @@ def load_config(path: str | Path) -> Config:
                 name=str(wp_raw["name"]),
                 dwell_time=float(wp_raw.get("dwell_time", 30)),
                 audio_file=str(wp_raw["audio_file"]),
+                play_audio_when_walking=bool(wp_raw.get("play_audio_when_walking", False)),
                 actions=list(wp_raw.get("actions") or []),
                 point=wp_raw.get("point"),
                 pose=pose,

@@ -135,6 +135,9 @@ class TourController:
     # ------------------------------------------------------------------
 
     def _execute_stop(self, waypoint: Waypoint) -> StopResult:
+        player = AudioPlayer(waypoint.audio_file)
+        if waypoint.play_audio_when_walking:
+            player.play()
         # 1. Navigate
         nav_ok = self._navigate(waypoint)
         if not nav_ok:
@@ -148,8 +151,8 @@ class TourController:
         self._run_actions(waypoint)
 
         # 3. Audio + dwell
-        player = AudioPlayer(waypoint.audio_file)
-        player.play()
+        if not waypoint.play_audio_when_walking:
+            player.play()
 
         self._dwell(waypoint, player)
 
