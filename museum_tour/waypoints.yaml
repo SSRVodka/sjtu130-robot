@@ -1,52 +1,43 @@
 robot:
-  host: "192.168.1.100"   # Replace with robot's actual IP
+  host: "192.168.11.2"   # Replace with robot's actual IP
   nav_poll_interval: 1.0  # seconds between navigation status polls
   nav_timeout: 120        # seconds before navigation is considered failed
 
 tour:
   # If true, operator must press Enter (or hardware button) before moving to next stop.
   # If false, the robot proceeds automatically after dwell_time expires.
-  wait_for_input: true
+  wait_for_input: false
   input_mode: "cli"       # "cli" | "button"
   # Only relevant when input_mode = "button":
   button_device: "/dev/input/event0"
   button_event_code: 272  # BTN_LEFT (mouse left-click) — see linux/input-event-codes.h
 
 waypoints:
-  - name: "Lobby Welcome"
+  - name: "test1"
     # Use either 'point' (named waypoint on the robot's map) or 'pose' (raw coordinates).
-    point: "lobby"
-    dwell_time: 20          # seconds to stay after arriving (ignored if wait_for_input)
-    audio_file: "audio/01_lobby_welcome.mp3"
-    actions:
-      - greet               # stub: wave / play greeting animation
-
-  - name: "Ancient Civilizations Hall"
-    point: "hall_ancient"
-    dwell_time: 45
-    audio_file: "audio/02_ancient_civilizations.mp3"
+    pose:
+      x: -0.91
+      y: 8.66
+      theta: -0.17
+    dwell_time: 25          # seconds to stay after arriving (ignored if wait_for_input)
+    audio_file: "mp4s/00-greet.wav"
     actions: []
 
-  - name: "Medieval Gallery"
+  - name: "test2"
+    pose:
+      x: 11.52
+      y: 13.53
+      theta: -0.1
+    dwell_time: 15
+    audio_file: "mp4s/03-how-sjtu-video.wav"
+    actions: []
+
+  - name: "test3"
     # Raw pose example (x, y in map pixels; theta in radians)
     pose:
-      x: 285
-      y: 410
-      theta: 1.57
+      x: 22.73
+      y: 11.3
+      theta: -0.32
     dwell_time: 40
-    audio_file: "audio/03_medieval_gallery.mp3"
-    actions:
-      - display_artifact    # stub: trigger an external display/projector
-
-  - name: "Modern Art Wing"
-    point: "modern_art"
-    dwell_time: 35
-    audio_file: "audio/04_modern_art.mp3"
+    audio_file: "mp4s/01-prologue.wav"
     actions: []
-
-  - name: "Exit & Gift Shop"
-    point: "exit"
-    dwell_time: 15
-    audio_file: "audio/05_exit.mp3"
-    actions:
-      - farewell            # stub: farewell gesture
