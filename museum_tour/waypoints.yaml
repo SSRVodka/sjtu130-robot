@@ -154,7 +154,7 @@ waypoints:
   - name: "25"
     dwell_time: 47
     audio_file: "mp4s/25-dingwenjiang-zengxiaoqin.wav"
-    pose: {x: 1.85, y: -0.22, theta: 0.77}
+    pose: {x: 3.21, y: 5.19, theta: -2.46}
     # pose: {x: 3.28, y: 4.99, theta: -2.12}
 
   - name: "26"
