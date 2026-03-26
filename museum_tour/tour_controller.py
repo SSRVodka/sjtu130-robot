@@ -110,9 +110,9 @@ class TourController:
                 logger.info("Stop requested — aborting tour.")
                 break
 
-            print(f"\n{'='*60}")
+            print(f"\n{'=' * 60}")
             print(f"  Stop {idx}/{total}: {waypoint.name}")
-            print(f"{'='*60}")
+            print(f"{'=' * 60}")
 
             stop_result = self._execute_stop(waypoint)
             result.stops.append(stop_result)
@@ -138,8 +138,13 @@ class TourController:
         player = AudioPlayer(waypoint.audio_file)
         if waypoint.play_audio_when_walking:
             player.play()
+            walking_start_time = time.monotonic()
         # 1. Navigate
         nav_ok = self._navigate(waypoint)
+        actual_dwell_time = waypoint.dwell_time
+        if waypoint.play_audio_when_walking:
+            walking_duration = time.monotonic() - walking_start_time
+            actual_dwell_time = max(0, waypoint.dwell_time - walking_duration) + 2
         if not nav_ok:
             return StopResult(
                 waypoint_name=waypoint.name,
@@ -154,7 +159,7 @@ class TourController:
         if not waypoint.play_audio_when_walking:
             player.play()
 
-        self._dwell(waypoint, player)
+        self._dwell(waypoint, player, actual_dwell_time)
 
         # 4. Ensure audio is stopped before leaving
         player.stop()
@@ -187,9 +192,11 @@ class TourController:
             timeout=robot_cfg.nav_timeout,
         )
 
-    def _dwell(self, waypoint: Waypoint, player: AudioPlayer) -> None:
+    def _dwell(
+        self, waypoint: Waypoint, player: AudioPlayer, actual_dwell_time: float
+    ) -> None:
         """Handle the dwell phase: wait for input or timer."""
-        dwell = waypoint.dwell_time
+        dwell = actual_dwell_time
 
         if self.config.tour.wait_for_input:
             # Operator decides when to advance; dwell_time acts as auto-advance
