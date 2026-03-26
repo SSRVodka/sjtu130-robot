@@ -14,7 +14,7 @@ tour:
 
 waypoints:
   - name: "00"
-    dwell_time: 25
+    dwell_time: 23
     audio_file: "mp4s/00-greet.wav"
     pose: {x: 30.21, y: 9.87, theta: 0.89}
 
@@ -26,13 +26,14 @@ waypoints:
   - name: "02"
     dwell_time: 40
     audio_file: "mp4s/02-great-encouragement.wav"
-    pose: {x: 33.04, y: 6.69, theta: 2.84}
+    pose: {x: 32.7, y: 6.54, theta: -3.06}
 
   - name: "03"
     dwell_time: 18
     audio_file: "mp4s/03-how-sjtu-video.wav"
     pose: {x: 30.21, y: 3.54, theta: 1.3}
 
+  # near little
   - name: "04"
     dwell_time: 40
     audio_file: "mp4s/04-intro-chapters.wav"
@@ -40,7 +41,7 @@ waypoints:
     pose: {x: 29.8, y: 5.66, theta: -1.48}
 
   - name: "05"
-    dwell_time: 73
+    dwell_time: 70
     audio_file: "mp4s/05-chapter1.wav"
     play_audio_when_walking: true
     pose: {x: 27.18, y: 5.78, theta: -0.51}
@@ -59,13 +60,14 @@ waypoints:
   - name: "08"
     dwell_time: 31
     audio_file: "mp4s/08-meets-country-needs.wav"
-    pose: {x: 20.85, y: -2.55, theta: 1.26}
+    pose: {x: 20.55, y: -1.99, theta: 1.41}
 
   - name: "09"
     dwell_time: 50
     audio_file: "mp4s/09-dig-dirt.wav"
-    pose: {x: 20.85, y: -2.55, theta: 2.85}
+    pose: {x: 20.55, y: -1.99, theta: 2.85}
 
+    # short 
   - name: "10"
     dwell_time: 30
     audio_file: "mp4s/10-big-ocean-moving.wav"
@@ -98,7 +100,7 @@ waypoints:
     pose: {x: 13.02, y: 4.6, theta: 1.57}
 
   - name: "15"
-    dwell_time: 25
+    dwell_time: 15
     audio_file: "mp4s/15-ai-moving.wav"
     play_audio_when_walking: true
     pose: {x: 8.22, y: 8.08, theta: 2.55}
@@ -123,13 +125,14 @@ waypoints:
     audio_file: "mp4s/19-hospital-ruijin.wav"
     pose: {x: 13.78, y: -2.4, theta: 2.23}
 
+  # longer (interest)
   - name: "20"
     dwell_time: 61
     audio_file: "mp4s/20-hospital-renji.wav"
     pose: {x: 13.78, y: -2.4, theta: 2.23}
 
   - name: "21"
-    dwell_time: 75
+    dwell_time: 55
     audio_file: "mp4s/21-eco-battlefield.wav"
     play_audio_when_walking: true
     pose: {x: 8.24, y: 5.51, theta: -2.38}
@@ -153,15 +156,17 @@ waypoints:
   - name: "25"
     dwell_time: 51
     audio_file: "mp4s/25-dingwenjiang-zengxiaoqin.wav"
-    pose: {x: 3.55, y: 5.49, theta: -2.23}
+    pose: {x: 1.85, y: -0.22, theta: 0.77}
+    # pose: {x: 3.28, y: 4.99, theta: -2.12}
 
   - name: "26"
     dwell_time: 19
     audio_file: "mp4s/26-selfie.wav"
-    pose: {x: -1.34, y: 4.63, theta: -0.03}
+    pose: {x: -0.89, y: 4.68, theta: -0.2}
+    # pose: {x: -1.34, y: 4.63, theta: -0.03}
 
   - name: "27"
-    dwell_time: 35
+    dwell_time: 15
     audio_file: "mp4s/27-liberal-arts-wisdom.wav"
     play_audio_when_walking: true
     pose: {x: -1.3, y: 9.17, theta: -0.08}
@@ -177,7 +182,7 @@ waypoints:
     pose: {x: 3.33, y: 11.01, theta: -2.43}
 
   - name: "30"
-    dwell_time: 45
+    dwell_time: 35
     audio_file: "mp4s/30-companies-0-bay.wav"
     play_audio_when_walking: true
     pose: {x: 8.22, y: 11.95, theta: 1.44}
