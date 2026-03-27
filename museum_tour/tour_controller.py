@@ -158,6 +158,8 @@ class TourController:
                     self.config.audio.remote_port)
             
             if wp.play_audio_when_walking:
+                logger.info("Playing audio '%s' when walking at '%s'.",
+                    wp.audio_file, wp.name)
                 self._audio.play()
                 self.state.update(audio_playing=True)
 
@@ -184,11 +186,15 @@ class TourController:
             actual_dwell_time = wp.dwell_time
             self.state.update(phase="dwelling")
             if not wp.play_audio_when_walking:
+                logger.info("Playing audio '%s' at '%s'.",
+                    wp.audio_file, wp.name)
                 self._audio.play()
                 self.state.update(audio_playing=True)
+            else:
                 # adjust dwell time if playing audio when walking (considering navigation time)
                 actual_dwell_time = max(0, wp.dwell_time - nav_duration) + 2
 
+            logger.info("Dwelling for %s seconds at '%s'.", actual_dwell_time, wp.name)
             self._dwell(actual_dwell_time)
 
             self._audio.stop()
@@ -230,8 +236,10 @@ class TourController:
         while time.monotonic() < deadline:
             remaining = deadline - time.monotonic()
             if self._interrupt.wait(timeout=min(remaining, 0.2)):
+                logger.debug("--- Dwell interrupted ---")
                 return  # interrupted
 
     def _run_actions(self, wp: Waypoint) -> None:
         for name in wp.actions:
+            logger.info("Running action '%s' at '%s'.", name, wp.name)
             action_registry.run_action(name, self.client, wp.name)
