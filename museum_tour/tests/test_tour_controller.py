@@ -1,14 +1,13 @@
 """tests/test_tour_controller.py — Unit tests for TourController."""
 
-import sys, os
+import sys, os, time, threading
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 import pytest
 
-from config import Config, RobotConfig, TourConfig, Waypoint, Pose
-from tour_controller import TourController, TourResult
-from input_handler import InputHandler
+from config import Config, RobotConfig, AudioConfig, ProbeConfig, Waypoint, Pose
+from tour_controller import TourController, TourState
 
 
 # ---------------------------------------------------------------------------
@@ -16,221 +15,204 @@ from input_handler import InputHandler
 # ---------------------------------------------------------------------------
 
 
-def make_waypoint(
-    name: str = "Test Stop",
-    point: str = "test",
-    dwell_time: float = 0,
-    audio_file: str = "test.mp3",
-    actions=None,
-) -> Waypoint:
-    return Waypoint(
-        name=name,
-        point=point,
-        dwell_time=dwell_time,
-        audio_file=audio_file,
-        actions=actions or [],
-    )
+def make_waypoint(name="Stop", point="p", dwell_time=0, audio="a.mp3", actions=None):
+    return Waypoint(name=name, point=point, dwell_time=dwell_time,
+                    audio_file=audio, actions=actions or [])
 
 
-def make_config(waypoints=None, wait_for_input=False) -> Config:
+def make_config(waypoints=None):
     return Config(
         robot=RobotConfig(host="10.0.0.1", nav_poll_interval=0, nav_timeout=5),
-        tour=TourConfig(wait_for_input=wait_for_input),
+        audio=AudioConfig(),
+        probe=ProbeConfig(),
         waypoints=waypoints or [make_waypoint()],
     )
 
 
-class AlwaysProceedInput(InputHandler):
-    """Immediately signals 'proceed'."""
-    def wait_for_proceed(self, timeout=None):
-        return True
+def make_client(nav_ok=True):
+    c = MagicMock()
+    c.nav_to_name.return_value = nav_ok
+    c.nav_to_pose.return_value = nav_ok
+    c.wait_for_arrival.return_value = nav_ok
+    c.cancel_navigation.return_value = True
+    return c
 
 
-@pytest.fixture()
-def mock_client():
-    client = MagicMock()
-    client.get_mode.return_value = 2         # navigation mode
-    client.nav_to_name.return_value = True
-    client.nav_to_pose.return_value = True
-    client.wait_for_arrival.return_value = True
-    return client
-
-
-def make_controller(config=None, client=None, input_handler=None):
-    return TourController(
-        config=config or make_config(),
-        client=client or MagicMock(),
-        input_handler=input_handler or AlwaysProceedInput(),
-    )
+def run_tour(controller, target, timeout=2.0):
+    """Start controller, jump_to target, wait for 'finished', then shutdown."""
+    controller.start()
+    controller.jump_to(target)
+    time.sleep(0.02)   # yield so controller thread can start processing
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if controller.state.snapshot()["phase"] == "finished":
+            break
+        time.sleep(0.05)
+    controller.shutdown()
 
 
 # ---------------------------------------------------------------------------
-# Tests
+# TourState
 # ---------------------------------------------------------------------------
 
 
-class TestTourControllerNavigation:
-    def test_single_waypoint_named_point(self, mock_client):
+class TestTourState:
+    def test_update_and_snapshot(self):
+        s = TourState()
+        s.update(phase="navigating", waypoint="A")
+        snap = s.snapshot()
+        assert snap["phase"] == "navigating"
+        assert snap["waypoint"] == "A"
+
+    def test_thread_safe_concurrent_updates(self):
+        s = TourState()
+        errors = []
+        def worker():
+            try:
+                for _ in range(100):
+                    s.update(phase="navigating")
+                    s.snapshot()
+            except Exception as e:
+                errors.append(e)
+        threads = [threading.Thread(target=worker) for _ in range(8)]
+        for t in threads: t.start()
+        for t in threads: t.join()
+        assert not errors
+
+
+# ---------------------------------------------------------------------------
+# TourController — basic flow
+# ---------------------------------------------------------------------------
+
+
+class TestTourControllerFlow:
+    def test_idle_until_jump_to(self):
+        ctrl = TourController(config=make_config(), client=make_client())
+        ctrl.start()
+        time.sleep(0.1)
+        assert ctrl.state.snapshot()["phase"] == "idle"
+        ctrl.shutdown()
+
+    def test_single_named_waypoint(self):
         wp = make_waypoint(name="Hall A", point="hall_a")
-        cfg = make_config(waypoints=[wp])
-        ctrl = make_controller(config=cfg, client=mock_client)
-
-        with patch("tour_controller.AudioPlayer") as MockAudio:
-            MockAudio.return_value.play.return_value = None
-            MockAudio.return_value.stop.return_value = None
-            result = ctrl.run()
-
-        mock_client.nav_to_name.assert_called_once_with("hall_a")
-        assert result.all_succeeded is True
-        assert result.stops[0].nav_success is True
-
-    def test_single_waypoint_pose(self, mock_client):
-        wp = Waypoint(
-            name="Gallery",
-            pose=Pose(x=100.0, y=200.0, theta=1.57),
-            dwell_time=0,
-            audio_file="g.mp3",
-        )
-        cfg = make_config(waypoints=[wp])
-        ctrl = make_controller(config=cfg, client=mock_client)
-
+        client = make_client()
+        ctrl = TourController(config=make_config([wp]), client=client)
         with patch("tour_controller.AudioPlayer"):
-            result = ctrl.run()
+            run_tour(ctrl, "Hall A")
+        client.nav_to_name.assert_called_with("hall_a")
 
-        mock_client.nav_to_pose.assert_called_once_with(100.0, 200.0, 1.57)
-        assert result.all_succeeded is True
-
-    def test_multiple_waypoints_all_succeed(self, mock_client):
-        waypoints = [make_waypoint(name=f"Stop {i}", point=f"stop_{i}") for i in range(3)]
-        cfg = make_config(waypoints=waypoints)
-        ctrl = make_controller(config=cfg, client=mock_client)
-
+    def test_pose_waypoint(self):
+        wp = Waypoint(name="Gallery", pose=Pose(1.0, 2.0, 1.57),
+                      dwell_time=0, audio_file="g.mp3")
+        client = make_client()
+        ctrl = TourController(config=make_config([wp]), client=client)
         with patch("tour_controller.AudioPlayer"):
-            result = ctrl.run()
+            run_tour(ctrl, "Gallery")
+        client.nav_to_pose.assert_called_with(1.0, 2.0, 1.57)
 
-        assert mock_client.nav_to_name.call_count == 3
-        assert len(result.stops) == 3
-        assert result.all_succeeded is True
-
-    def test_nav_failure_continues_tour(self, mock_client):
-        """A failed navigation stop should not abort the whole tour."""
-        mock_client.wait_for_arrival.side_effect = [False, True, True]
-        waypoints = [make_waypoint(name=f"Stop {i}", point=f"s{i}") for i in range(3)]
-        cfg = make_config(waypoints=waypoints)
-        ctrl = make_controller(config=cfg, client=mock_client)
-
+    def test_multiple_waypoints_all_navigated(self):
+        waypoints = [make_waypoint(name=f"S{i}", point=f"p{i}") for i in range(3)]
+        client = make_client()
+        ctrl = TourController(config=make_config(waypoints), client=client)
         with patch("tour_controller.AudioPlayer"):
-            result = ctrl.run()
+            run_tour(ctrl, "S0", timeout=3.0)
+        assert client.nav_to_name.call_count == 3
 
-        assert len(result.stops) == 3
-        assert result.stops[0].nav_success is False
-        assert result.stops[1].nav_success is True
-        assert result.all_succeeded is False
-
-    def test_nav_command_failure_records_error(self, mock_client):
-        mock_client.nav_to_name.return_value = False
-        ctrl = make_controller(client=mock_client)
-
+    def test_failed_navigation_skipped_continues(self):
+        waypoints = [make_waypoint(name=f"S{i}", point=f"p{i}") for i in range(3)]
+        client = make_client()
+        client.wait_for_arrival.side_effect = [False, True, True]
+        ctrl = TourController(config=make_config(waypoints), client=client)
         with patch("tour_controller.AudioPlayer"):
-            result = ctrl.run()
+            run_tour(ctrl, "S0", timeout=3.0)
+        assert client.nav_to_name.call_count == 3   # all three attempted
 
-        assert result.stops[0].nav_success is False
-        assert result.stops[0].error is not None
-
-
-class TestTourControllerInput:
-    def test_wait_for_input_calls_handler(self, mock_client):
-        handler = MagicMock(spec=InputHandler)
-        handler.wait_for_proceed.return_value = True
-        cfg = make_config(wait_for_input=True)
-        ctrl = make_controller(config=cfg, client=mock_client, input_handler=handler)
-
+    def test_start_from_middle_waypoint(self):
+        waypoints = [make_waypoint(name=f"S{i}", point=f"p{i}") for i in range(4)]
+        client = make_client()
+        ctrl = TourController(config=make_config(waypoints), client=client)
         with patch("tour_controller.AudioPlayer"):
-            ctrl.run()
+            run_tour(ctrl, "S2", timeout=3.0)
+        calls = [c.args[0] for c in client.nav_to_name.call_args_list]
+        assert calls == ["p2", "p3"], f"got {calls}"
 
-        handler.wait_for_proceed.assert_called_once()
 
-    def test_no_wait_does_not_call_handler(self, mock_client):
-        handler = MagicMock(spec=InputHandler)
-        cfg = make_config(wait_for_input=False)
-        ctrl = make_controller(config=cfg, client=mock_client, input_handler=handler)
+# ---------------------------------------------------------------------------
+# TourController — jump_to
+# ---------------------------------------------------------------------------
 
+
+class TestJumpTo:
+    def test_unknown_waypoint_returns_false(self):
+        ctrl = TourController(config=make_config(), client=make_client())
+        assert ctrl.jump_to("nonexistent") is False
+
+    def test_known_waypoint_returns_true(self):
+        wp = make_waypoint(name="A", point="a")
+        ctrl = TourController(config=make_config([wp]), client=make_client())
+        ctrl.start()
+        assert ctrl.jump_to("A") is True
+        ctrl.shutdown()
+
+    def test_jump_interrupts_dwell(self):
+        """jump_to during a long dwell should abort within ~0.2 s (poll granularity)."""
+        wp1 = make_waypoint(name="A", point="a", dwell_time=60)
+        wp2 = make_waypoint(name="B", point="b", dwell_time=0)
+        client = make_client()
+        ctrl = TourController(config=make_config([wp1, wp2]), client=client)
+
+        ctrl.start()
         with patch("tour_controller.AudioPlayer"):
-            ctrl.run()
+            ctrl.jump_to("A")
+            time.sleep(0.3)          # let it settle into the dwell
+            t0 = time.monotonic()
+            ctrl.jump_to("B")
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                if ctrl.state.snapshot()["phase"] == "finished":
+                    break
+                time.sleep(0.05)
+        ctrl.shutdown()
+        assert time.monotonic() - t0 < 2.0, "jump_to should abort dwell within 2 s"
 
-        handler.wait_for_proceed.assert_not_called()
+
+class TestReset:
+    def test_reset_to_idle(self):
+        ctrl = TourController(config=make_config(), client=make_client())
+        ctrl.start()
+        ctrl.jump_to("A")
+        time.sleep(0.1)
+        ctrl.reset()
+        assert ctrl.state.snapshot()["phase"] == "idle"
+        ctrl.shutdown()
+    
+    def test_reset_during_dwell(self):
+        ctrl = TourController(config=make_config(), client=make_client())
+        ctrl.start()
+        ctrl.jump_to("A")
+        time.sleep(0.1)
+        ctrl.reset()
+        assert ctrl.state.snapshot()["phase"] == "idle"
+        ctrl.shutdown()
 
 
-class TestTourControllerActions:
-    def test_actions_are_executed(self, mock_client):
-        wp = make_waypoint(actions=["greet", "display_artifact"])
-        cfg = make_config(waypoints=[wp])
-        ctrl = make_controller(config=cfg, client=mock_client)
+# ---------------------------------------------------------------------------
+# TourController — actions
+# ---------------------------------------------------------------------------
 
+
+class TestActions:
+    def test_registered_actions_called(self):
+        wp = make_waypoint(name="A", point="a", actions=["greet"])
+        client = make_client()
+        ctrl = TourController(config=make_config([wp]), client=client)
         with patch("tour_controller.AudioPlayer"), \
              patch("tour_controller.action_registry.run_action") as mock_run:
-            ctrl.run()
+            run_tour(ctrl, "A")
+        mock_run.assert_called_once_with("greet", client, "A")
 
-        assert mock_run.call_count == 2
-        mock_run.assert_any_call("greet", mock_client, wp.name)
-        mock_run.assert_any_call("display_artifact", mock_client, wp.name)
-
-    def test_unknown_action_does_not_crash(self, mock_client):
-        """Unknown action names should be skipped with a warning, not crash."""
-        import actions as ar
-        wp = make_waypoint(actions=["nonexistent_action"])
-        cfg = make_config(waypoints=[wp])
-        ctrl = make_controller(config=cfg, client=mock_client)
-
+    def test_unknown_action_does_not_crash(self):
+        wp = make_waypoint(name="A", point="a", actions=["no_such_action"])
+        ctrl = TourController(config=make_config([wp]), client=make_client())
         with patch("tour_controller.AudioPlayer"):
-            result = ctrl.run()   # should not raise
-
-        assert result.all_succeeded is True
-
-
-class TestTourControllerStop:
-    def test_request_stop_aborts_after_current(self, mock_client):
-        waypoints = [make_waypoint(name=f"S{i}", point=f"s{i}") for i in range(4)]
-        cfg = make_config(waypoints=waypoints)
-        ctrl = make_controller(config=cfg, client=mock_client)
-
-        stop_called = []
-
-        def side_effect_nav_to_name(point):
-            stop_called.append(point)
-            if point == "s1":
-                ctrl.request_stop()
-            return True
-
-        mock_client.nav_to_name.side_effect = side_effect_nav_to_name
-        mock_client.cancel_navigation.return_value = True
-
-        with patch("tour_controller.AudioPlayer"):
-            result = ctrl.run()
-
-        # Should have processed s0 and s1, then aborted
-        assert len(result.stops) <= 2
-
-
-class TestTourResult:
-    def test_all_succeeded_true(self):
-        r = TourResult()
-        from tour_controller import StopResult
-        r.stops = [StopResult("A", True), StopResult("B", True)]
-        assert r.all_succeeded is True
-
-    def test_all_succeeded_false(self):
-        from tour_controller import StopResult
-        r = TourResult()
-        r.stops = [StopResult("A", True), StopResult("B", False)]
-        assert r.all_succeeded is False
-
-    def test_summary_contains_names(self):
-        from tour_controller import StopResult
-        r = TourResult()
-        r.stops = [StopResult("Ancient Hall", True), StopResult("Modern Wing", False)]
-        s = r.summary()
-        assert "Ancient Hall" in s
-        assert "Modern Wing" in s
-        assert "OK" in s
-        assert "FAIL" in s
+            run_tour(ctrl, "A")   # should not raise

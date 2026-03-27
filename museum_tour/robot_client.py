@@ -13,7 +13,7 @@ import requests
 logger = logging.getLogger(__name__)
 
 # Default timeout for individual HTTP requests (seconds)
-_HTTP_TIMEOUT = 10
+_HTTP_TIMEOUT = 3
 
 
 # ---------------------------------------------------------------------------
@@ -225,6 +225,10 @@ class RobotClient:
                 logger.warning(
                     "Navigation failed. res=%s reason=%s", status.res, status.reason
                 )
+                return False
+
+            if status.res == NavRes.CANCELLED:
+                logger.info("Navigation cancelled.")
                 return False
 
             time.sleep(poll_interval)

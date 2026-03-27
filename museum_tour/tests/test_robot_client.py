@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from unittest.mock import MagicMock, patch, call
 import pytest
 
-from robot_client import RobotClient, NavStatus, NavRes, NavReason
+from robot_client import RobotClient, NavStatus, NavRes, NavReason, _HTTP_TIMEOUT
 
 
 # ---------------------------------------------------------------------------
@@ -76,7 +76,7 @@ class TestRobotClientBasicInfo:
         mock_session.get.return_value = make_response({"version": "v3.1.5"})
         assert client.get_version() == "v3.1.5"
         mock_session.get.assert_called_once_with(
-            "http://10.0.0.1/reeman/current_version", timeout=10
+            "http://10.0.0.1/reeman/current_version", timeout=_HTTP_TIMEOUT
         )
 
     def test_get_pose(self, client, mock_session):
@@ -101,7 +101,7 @@ class TestRobotClientNavigation:
         mock_session.post.return_value = make_response({"status": "success"})
         assert client.nav_to_name("hall_a") is True
         mock_session.post.assert_called_once_with(
-            "http://10.0.0.1/cmd/nav_name", json={"point": "hall_a"}, timeout=10
+            "http://10.0.0.1/cmd/nav_name", json={"point": "hall_a"}, timeout=_HTTP_TIMEOUT
         )
 
     def test_nav_to_name_failure(self, client, mock_session):
@@ -116,7 +116,7 @@ class TestRobotClientNavigation:
         mock_session.post.return_value = make_response({"status": "success"})
         assert client.nav_to_pose(1.0, 2.0, 0.5) is True
         mock_session.post.assert_called_once_with(
-            "http://10.0.0.1/cmd/nav", json={"x": 1.0, "y": 2.0, "theta": 0.5}, timeout=10
+            "http://10.0.0.1/cmd/nav", json={"x": 1.0, "y": 2.0, "theta": 0.5}, timeout=_HTTP_TIMEOUT
         )
 
     def test_cancel_navigation(self, client, mock_session):
@@ -138,7 +138,7 @@ class TestWaitForArrival:
             make_response({"res": 3, "reason": 0, "goal": "A", "dist": 0, "mileage": 1.2}),
         ]
         mock_session.get.side_effect = responses
-        assert client.wait_for_arrival(poll_interval=0, timeout=10) is True
+        assert client.wait_for_arrival(poll_interval=0, timeout=_HTTP_TIMEOUT) is True
         assert mock_session.get.call_count == 3
 
     def test_fails_on_nav_failure(self, client, mock_session):
@@ -157,7 +157,7 @@ class TestWaitForArrival:
         assert result is False
         # cancel_goal should have been called
         mock_session.post.assert_called_with(
-            "http://10.0.0.1/cmd/cancel_goal", json={}, timeout=10
+            "http://10.0.0.1/cmd/cancel_goal", json={}, timeout=_HTTP_TIMEOUT
         )
 
     def test_handles_none_status(self, client, mock_session):

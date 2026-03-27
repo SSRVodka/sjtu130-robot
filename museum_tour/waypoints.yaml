@@ -1,222 +1,223 @@
 robot:
-  host: "192.168.11.2"   # Replace with robot's actual IP
+  # host: "192.168.11.2"   # Replace with robot's actual IP
+  host: "127.0.0.1:11112"
   nav_poll_interval: 1.0  # seconds between navigation status polls
   nav_timeout: 120        # seconds before navigation is considered failed
 
-tour:
-  # If true, operator must press Enter (or hardware button) before moving to next stop.
-  # If false, the robot proceeds automatically after dwell_time expires.
-  wait_for_input: false
-  input_mode: "cli"       # "cli" | "button"
-  # Only relevant when input_mode = "button":
-  button_device: "/dev/input/event0"
-  button_event_code: 272  # BTN_LEFT (mouse left-click) — see linux/input-event-codes.h
+audio:
+  local_mode: false
+  sound_card_id: 0
+  # remote_host: "192.168.11.2"
+  remote_host: "10.72.225.229"
+  remote_port: 8888
+
+probe:
+  host: "0.0.0.0"
+  port: 8080
 
 waypoints:
   - name: "00"
-    dwell_time: 23
+    dwell_time: 21
     audio_file: "mp4s/00-greet.wav"
     pose: {x: 30.21, y: 9.87, theta: 0.89}
 
   - name: "01"
-    dwell_time: 41
+    dwell_time: 37
     audio_file: "mp4s/01-prologue.wav"
     pose: {x: 30.21, y: 9.87, theta: 0.89}
 
   - name: "02"
-    dwell_time: 40
+    dwell_time: 36
     audio_file: "mp4s/02-great-encouragement.wav"
     pose: {x: 32.7, y: 6.54, theta: -3.06}
 
   - name: "03"
-    dwell_time: 18
+    dwell_time: 14
     audio_file: "mp4s/03-how-sjtu-video.wav"
     pose: {x: 30.21, y: 3.54, theta: 1.3}
 
-  # near little
   - name: "04"
-    dwell_time: 40
+    dwell_time: 36
     audio_file: "mp4s/04-intro-chapters.wav"
     play_audio_when_walking: true
     pose: {x: 29.8, y: 5.66, theta: -1.48}
-
+  
   - name: "05"
-    dwell_time: 70
+    dwell_time: 69
     audio_file: "mp4s/05-chapter1.wav"
     play_audio_when_walking: true
     pose: {x: 27.18, y: 5.78, theta: -0.51}
-
+  
   - name: "06"
-    dwell_time: 56
+    dwell_time: 52
     audio_file: "mp4s/06-reform-pioneers.wav"
     play_audio_when_walking: true
     pose: {x: 28.83, y: -0.64, theta: 2.38}
 
   - name: "07"
-    dwell_time: 69
+    dwell_time: 65
     audio_file: "mp4s/07-chapter2.wav"
     pose: {x: 27.03, y: -1.61, theta: 1.77}
 
   - name: "08"
-    dwell_time: 31
+    dwell_time: 27
     audio_file: "mp4s/08-meets-country-needs.wav"
     pose: {x: 20.55, y: -1.99, theta: 1.41}
 
   - name: "09"
-    dwell_time: 50
+    dwell_time: 46
     audio_file: "mp4s/09-dig-dirt.wav"
     pose: {x: 20.55, y: -1.99, theta: 2.85}
 
-    # short 
   - name: "10"
-    dwell_time: 30
+    dwell_time: 26
     audio_file: "mp4s/10-big-ocean-moving.wav"
     play_audio_when_walking: true
     pose: {x: 18.76, y: 6.93, theta: -0.95}
 
   - name: "11-1"
-    dwell_time: 63
+    dwell_time: 59
     audio_file: "mp4s/11-1-deep-ocean-platform.wav"
     pose: {x: 18.76, y: 6.93, theta: -0.95}
 
   - name: "11-2"
-    dwell_time: 36
+    dwell_time: 27
     audio_file: "mp4s/11-2-create.wav"
     pose: {x: 22.17, y: 5.54, theta: 2.57}
 
   - name: "12"
-    dwell_time: 81
+    dwell_time: 77
     audio_file: "mp4s/12-world-frontier.wav"
     pose: {x: 20.61, y: 7.9, theta: -2.31}
 
   - name: "13"
-    dwell_time: 54
+    dwell_time: 50
     audio_file: "mp4s/13-quantum-tech.wav"
     pose: {x: 18.26, y: 8.25, theta: 1.6}
 
   - name: "14"
-    dwell_time: 48
+    dwell_time: 44
     audio_file: "mp4s/14-nuclear-fusion.wav"
     pose: {x: 13.02, y: 4.6, theta: 1.57}
 
   - name: "15"
-    dwell_time: 15
+    dwell_time: 21
     audio_file: "mp4s/15-ai-moving.wav"
     play_audio_when_walking: true
     pose: {x: 8.22, y: 8.08, theta: 2.55}
 
   - name: "16"
-    dwell_time: 43
+    dwell_time: 39
     audio_file: "mp4s/16-deeprare.wav"
     pose: {x: 8.22, y: 8.08, theta: 2.55}
 
   - name: "17"
-    dwell_time: 36
+    dwell_time: 32
     audio_file: "mp4s/17-facing-people-health.wav"
     pose: {x: 13.46, y: 1.92, theta: -2.84}
 
   - name: "18"
-    dwell_time: 17
+    dwell_time: 13
     audio_file: "mp4s/18-people-model.wav"
     pose: {x: 11.81, y: 0.63, theta: 1.51}
 
   - name: "19"
-    dwell_time: 49
+    dwell_time: 45
     audio_file: "mp4s/19-hospital-ruijin.wav"
     pose: {x: 13.78, y: -2.4, theta: 2.23}
 
-  # longer (interest)
+
   - name: "20"
-    dwell_time: 61
+    dwell_time: 57
     audio_file: "mp4s/20-hospital-renji.wav"
     pose: {x: 13.78, y: -2.4, theta: 2.23}
-
+  
   - name: "21"
-    dwell_time: 55
+    dwell_time: 71
     audio_file: "mp4s/21-eco-battlefield.wav"
     play_audio_when_walking: true
     pose: {x: 8.24, y: 5.51, theta: -2.38}
 
   - name: "22"
-    dwell_time: 35
+    dwell_time: 31
     audio_file: "mp4s/22-eco-sunhao.wav"
     pose: {x: 8.24, y: 5.51, theta: -2.38}
 
   - name: "23"
-    dwell_time: 41
+    dwell_time: 37
     audio_file: "mp4s/23-eco-lijun.wav"
     pose: {x: 8.24, y: 5.51, theta: -2.38}
-
+  #
   - name: "24"
-    dwell_time: 36
+    dwell_time: 32
     audio_file: "mp4s/24-material.wav"
     play_audio_when_walking: true
     pose: {x: 3.33, y: 2.12, theta: 0.37}
 
   - name: "25"
-    dwell_time: 51
+    dwell_time: 47
     audio_file: "mp4s/25-dingwenjiang-zengxiaoqin.wav"
-    pose: {x: 1.85, y: -0.22, theta: 0.77}
+    pose: {x: 3.21, y: 5.19, theta: -2.46}
     # pose: {x: 3.28, y: 4.99, theta: -2.12}
 
   - name: "26"
-    dwell_time: 19
+    dwell_time: 15
     audio_file: "mp4s/26-selfie.wav"
     pose: {x: -0.89, y: 4.68, theta: -0.2}
     # pose: {x: -1.34, y: 4.63, theta: -0.03}
-
+  
   - name: "27"
-    dwell_time: 15
+    dwell_time: 31
     audio_file: "mp4s/27-liberal-arts-wisdom.wav"
     play_audio_when_walking: true
     pose: {x: -1.3, y: 9.17, theta: -0.08}
 
   - name: "28"
-    dwell_time: 15
+    dwell_time: 11
     audio_file: "mp4s/28-vr.wav"
     pose: {x: -1.3, y: 9.17, theta: -0.08}
 
   - name: "29"
-    dwell_time: 46
+    dwell_time: 42
     audio_file: "mp4s/29-rconvert-0-bay-video.wav"
     pose: {x: 3.33, y: 11.01, theta: -2.43}
-
+  
   - name: "30"
-    dwell_time: 35
+    dwell_time: 41
     audio_file: "mp4s/30-companies-0-bay.wav"
     play_audio_when_walking: true
     pose: {x: 8.22, y: 11.95, theta: 1.44}
 
   - name: "31"
-    dwell_time: 27
+    dwell_time: 23
     audio_file: "mp4s/31-jaka.wav"
     pose: {x: 8.22, y: 11.95, theta: 1.44}
 
   - name: "32"
-    dwell_time: 39
+    dwell_time: 35
     audio_file: "mp4s/32-linding-optics.wav"
     pose: {x: 8.22, y: 11.95, theta: 1.44}
 
   - name: "33"
-    dwell_time: 28
+    dwell_time: 24
     audio_file: "mp4s/33-service-region.wav"
     pose: {x: 14.42, y: 13.88, theta: -1.45}
 
   - name: "34"
-    dwell_time: 54
+    dwell_time: 50
     audio_file: "mp4s/34-yunnan-erhai.wav"
     pose: {x: 19.09, y: 12.42, theta: 2.19}
 
   - name: "35"
-    dwell_time: 29
+    dwell_time: 25
     audio_file: "mp4s/35-chapter3-jaka-dance-video.wav"
     pose: {x: 19.09, y: 12.42, theta: 0.15}
 
   - name: "36"
-    dwell_time: 14
+    dwell_time: 10
     audio_file: "mp4s/36-sjtu-hewei-video.wav"
     pose: {x: 24.1, y: 14.18, theta: -2.19}
-
+  
   - name: "37"
     dwell_time: 42
     audio_file: "mp4s/37-bye.wav"

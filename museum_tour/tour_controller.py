@@ -1,61 +1,57 @@
-"""tour_controller.py — Orchestrates the museum guided tour.
+"""tour_controller.py — Threaded museum tour orchestrator.
 
-Sequence for each waypoint
---------------------------
-1. Issue navigation command (by name or pose).
-2. Block until arrival (or failure/timeout).
-3. Run pre-dwell actions (e.g. greeting gesture).
-4. Start audio playback.
-5. Wait for dwell_time **or** operator input (if wait_for_input is enabled).
-6. Stop audio (if still playing).
-7. Advance to next waypoint.
+The controller starts *idle* and waits for a :meth:`jump_to` call before
+doing anything.  Each call to :meth:`jump_to` interrupts any running tour
+and restarts it from the named waypoint, then proceeds sequentially.
+
+Per-stop sequence
+-----------------
+1. Navigate (by name or pose).
+2. Run pre-dwell actions.
+3. Start audio; dwell for ``dwell_time`` seconds.
+4. Stop audio; advance.
 """
 
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Dict, Optional
 
 import actions as action_registry
-from audio_player import AudioPlayer
+from audio_player import AudioPlayer, LocalAudioPlayer, RemoteAudioPlayer
 from config import Config, Waypoint
-from input_handler import InputHandler, make_input_handler
 from robot_client import RobotClient
 
 logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Per-stop result record
+# Shared state (read by probe server from another thread)
 # ---------------------------------------------------------------------------
 
 
 @dataclass
-class StopResult:
-    waypoint_name: str
-    nav_success: bool
-    skipped: bool = False
-    error: Optional[str] = None
+class TourState:
+    phase: str = "idle"            # "idle" | "navigating" | "dwelling" | "finished"
+    waypoint: Optional[str] = None # current waypoint name
+    audio_playing: bool = False
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
+    def update(self, **kwargs) -> None:
+        with self._lock:
+            for k, v in kwargs.items():
+                setattr(self, k, v)
 
-@dataclass
-class TourResult:
-    stops: List[StopResult] = field(default_factory=list)
-
-    @property
-    def all_succeeded(self) -> bool:
-        return all(s.nav_success or s.skipped for s in self.stops)
-
-    def summary(self) -> str:
-        lines = ["=== Tour Summary ==="]
-        for s in self.stops:
-            status = "OK" if s.nav_success else ("SKIP" if s.skipped else "FAIL")
-            lines.append(f"  [{status}] {s.waypoint_name}")
-            if s.error:
-                lines.append(f"        Error: {s.error}")
-        return "\n".join(lines)
+    def snapshot(self) -> dict:
+        with self._lock:
+            return {
+                "phase": self.phase,
+                "waypoint": self.waypoint,
+                "audio_playing": self.audio_playing,
+            }
 
 
 # ---------------------------------------------------------------------------
@@ -65,159 +61,177 @@ class TourResult:
 
 class TourController:
     """
-    High-level controller that drives the robot through all waypoints.
+    Drives the robot through waypoints in a background thread.
 
-    Parameters
-    ----------
-    config:
-        Fully parsed :class:`~config.Config` object.
-    client:
-        A :class:`~robot_client.RobotClient` connected to the robot.
-    input_handler:
-        Strategy for waiting for operator "proceed" input.  If ``None``,
-        one is constructed from ``config.tour``.
+    Call :meth:`start` once to launch the thread, then :meth:`jump_to` to
+    begin (or restart) the tour from any named waypoint.
     """
 
-    def __init__(
-        self,
-        config: Config,
-        client: RobotClient,
-        input_handler: Optional[InputHandler] = None,
-    ) -> None:
+    def __init__(self, config: Config, client: RobotClient) -> None:
         self.config = config
         self.client = client
-        self._input_handler: InputHandler = input_handler or make_input_handler(
-            mode=config.tour.input_mode,
-            device=config.tour.button_device,
-            code=config.tour.button_event_code,
-        )
-        self._stop_requested = False
+        self.state = TourState()
+
+        self._wp_index: Dict[str, int] = {
+            wp.name: i for i, wp in enumerate(config.waypoints)
+        }
+        # Signalled by jump_to() to interrupt the current tour loop.
+        self._interrupt = threading.Event()
+        self._next_target: Optional[str] = None
+        self._audio: Optional[AudioPlayer] = None
+        self._shutdown = False
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
-    def run(self) -> TourResult:
-        """Execute the full tour and return a :class:`TourResult`."""
-        result = TourResult()
-        total = len(self.config.waypoints)
+    def start(self) -> None:
+        """Launch the controller thread (stays idle until jump_to is called)."""
+        t = threading.Thread(target=self._run, daemon=True, name="tour-ctrl")
+        t.start()
+        logger.info("Tour controller started — idle. Send PUT /tour?dst=<n> to begin.")
 
-        logger.info("Starting museum tour — %d stops.", total)
-        self._verify_navigation_mode()
+    def jump_to(self, waypoint_name: str) -> bool:
+        """
+        Interrupt any running tour and restart from *waypoint_name*.
 
-        for idx, waypoint in enumerate(self.config.waypoints, start=1):
-            if self._stop_requested:
-                logger.info("Stop requested — aborting tour.")
-                break
-
-            print(f"\n{'='*60}")
-            print(f"  Stop {idx}/{total}: {waypoint.name}")
-            print(f"{'='*60}")
-
-            stop_result = self._execute_stop(waypoint)
-            result.stops.append(stop_result)
-
-            if not stop_result.nav_success and not stop_result.skipped:
-                logger.warning(
-                    "Navigation failed at '%s'. Continuing to next stop.", waypoint.name
-                )
-
-        logger.info("Tour complete.\n%s", result.summary())
-        return result
-
-    def request_stop(self) -> None:
-        """Signal the tour to stop after the current waypoint finishes."""
-        self._stop_requested = True
-        self.client.cancel_navigation()
-
-    # ------------------------------------------------------------------
-    # Internal: per-stop logic
-    # ------------------------------------------------------------------
-
-    def _execute_stop(self, waypoint: Waypoint) -> StopResult:
-        player = AudioPlayer(waypoint.audio_file)
-        if waypoint.play_audio_when_walking:
-            player.play()
-        # 1. Navigate
-        nav_ok = self._navigate(waypoint)
-        if not nav_ok:
-            return StopResult(
-                waypoint_name=waypoint.name,
-                nav_success=False,
-                error="Navigation failed or timed out",
-            )
-
-        # 2. Pre-dwell actions (e.g. greeting)
-        self._run_actions(waypoint)
-
-        # 3. Audio + dwell
-        if not waypoint.play_audio_when_walking:
-            player.play()
-
-        self._dwell(waypoint, player)
-
-        # 4. Ensure audio is stopped before leaving
-        player.stop()
-
-        return StopResult(waypoint_name=waypoint.name, nav_success=True)
-
-    def _navigate(self, waypoint: Waypoint) -> bool:
-        """Send the navigation command and wait for arrival."""
-        robot_cfg = self.config.robot
-
-        if waypoint.point is not None:
-            logger.info("Navigating to named point '%s'…", waypoint.point)
-            sent = self.client.nav_to_name(waypoint.point)
-        else:
-            p = waypoint.pose  # type: ignore[union-attr]
-            assert p is not None, "a waypoint must specify either 'point' or 'pose'"
-            logger.info("Navigating to pose (%.2f, %.2f, %.2f)…", p.x, p.y, p.theta)
-            sent = self.client.nav_to_pose(p.x, p.y, p.theta)
-
-        if not sent:
-            logger.error("Failed to send navigation command for '%s'.", waypoint.name)
+        Returns False if *waypoint_name* is not in the waypoint list.
+        """
+        if waypoint_name not in self._wp_index:
             return False
+        self._next_target = waypoint_name
+        self._interrupt.set()            # wake the dwell loop / unblock idle wait
+        self.client.cancel_navigation()  # unblock wait_for_arrival if navigating
+        if self._audio:
+            self._audio.stop()
+        logger.info("jump_to('%s') requested.", waypoint_name)
+        return True
+    
+    def reset(self) -> None:
+        """
+        Immediately interrupts any running tour and resets the tour controller to idle state.
+        """
+        self._next_target = None
+        self._interrupt.set()
+        self.client.cancel_navigation()
+        if self._audio:
+            self._audio.stop()
+        self.state.update(phase="idle", waypoint=None, audio_playing=False)
+        logger.info("Tour controller reset to idle state.")
 
-        logger.info("Waiting for server to get ready for navigation status...")
-        # NOTE: do NOT remove it. REEMAN server needs time to get ready for navigation status.
-        time.sleep(3)
+    def shutdown(self) -> None:
+        """Stop the tour and terminate the controller thread."""
+        self._shutdown = True
+        self._interrupt.set()
+        self.client.cancel_navigation()
+        if self._audio:
+            self._audio.stop()
+
+    # ------------------------------------------------------------------
+    # Internal: main loop
+    # ------------------------------------------------------------------
+
+    def _run(self) -> None:
+        while not self._shutdown:
+            self._interrupt.wait()          # block until jump_to() or shutdown
+            if self._shutdown:
+                break
+            self._interrupt.clear()
+            target = self._next_target
+            if target is None or target not in self._wp_index:
+                continue
+            self._execute_from(self._wp_index[target])
+
+        self.state.update(phase="idle", waypoint=None, audio_playing=False)
+
+    def _execute_from(self, start_idx: int) -> None:
+        total = len(self.config.waypoints)
+        for wp in self.config.waypoints[start_idx:]:
+            if self._interrupt.is_set():
+                return
+            
+            # build audio client
+            self._audio = LocalAudioPlayer(wp.audio_file, self.config.audio.sound_card_id) \
+                if self.config.audio.local_mode \
+                else RemoteAudioPlayer(wp.audio_file,
+                    self.config.audio.remote_host,
+                    self.config.audio.remote_port)
+            
+            if wp.play_audio_when_walking:
+                self._audio.play()
+                self.state.update(audio_playing=True)
+
+            # 1. Navigate
+            logger.info("Stop %d/%d — navigating to '%s'.", start_idx + 1, total, wp.name)
+            self.state.update(phase="navigating", waypoint=wp.name)
+            nav_start_time = time.monotonic()
+            if not self._navigate(wp):
+                logger.warning("Navigation failed at '%s', skipping.", wp.name)
+                start_idx += 1
+                continue
+            start_idx += 1
+            nav_duration = time.monotonic() - nav_start_time
+
+            if self._interrupt.is_set():
+                return
+
+            # 2. Pre-dwell actions
+            self._run_actions(wp)
+            if self._interrupt.is_set():
+                return
+
+            # 3. Audio + dwell
+            actual_dwell_time = wp.dwell_time
+            self.state.update(phase="dwelling")
+            if not wp.play_audio_when_walking:
+                self._audio.play()
+                self.state.update(audio_playing=True)
+                # adjust dwell time if playing audio when walking (considering navigation time)
+                actual_dwell_time = max(0, wp.dwell_time - nav_duration) + 2
+
+            self._dwell(actual_dwell_time)
+
+            self._audio.stop()
+            self._audio = None
+            self.state.update(audio_playing=False)
+
+        if not self._interrupt.is_set():
+            self.state.update(phase="finished", waypoint=None)
+            logger.info("Tour complete.")
+
+    # ------------------------------------------------------------------
+    # Internal: step helpers
+    # ------------------------------------------------------------------
+
+    def _navigate(self, wp: Waypoint) -> bool:
+        cfg = self.config.robot
+        if wp.point is not None:
+            sent = self.client.nav_to_name(wp.point)
+        else:
+            p = wp.pose  # type: ignore[union-attr]
+            assert p is not None, "pose or point is required for a waypoint"
+            sent = self.client.nav_to_pose(p.x, p.y, p.theta)
+        if not sent:
+            return False
+        
+        logger.info("Waiting for REEMAN server to respond...")
+        # NOTE: do NOT remove this. REEMAN server needs time to update navigation status
+        time.sleep(1)
         logger.info("Waiting for arrival...")
+
         return self.client.wait_for_arrival(
-            poll_interval=robot_cfg.nav_poll_interval,
-            timeout=robot_cfg.nav_timeout,
+            poll_interval=cfg.nav_poll_interval,
+            timeout=cfg.nav_timeout,
         )
 
-    def _dwell(self, waypoint: Waypoint, player: AudioPlayer) -> None:
-        """Handle the dwell phase: wait for input or timer."""
-        dwell = waypoint.dwell_time
+    def _dwell(self, seconds: float) -> None:
+        """Sleep for *seconds*, waking immediately if interrupted."""
+        deadline = time.monotonic() + seconds
+        while time.monotonic() < deadline:
+            remaining = deadline - time.monotonic()
+            if self._interrupt.wait(timeout=min(remaining, 0.2)):
+                return  # interrupted
 
-        if self.config.tour.wait_for_input:
-            # Operator decides when to advance; dwell_time acts as auto-advance
-            # fallback so the tour doesn't stall forever if no operator is present.
-            self._input_handler.wait_for_proceed(timeout=dwell if dwell > 0 else None)
-        else:
-            logger.info("Dwelling for %.0f seconds at '%s'…", dwell, waypoint.name)
-            # Sleep in small increments so audio can finish naturally
-            end_time = time.monotonic() + dwell
-            while time.monotonic() < end_time:
-                if self._stop_requested:
-                    break
-                time.sleep(0.25)
-
-    def _run_actions(self, waypoint: Waypoint) -> None:
-        for action_name in waypoint.actions:
-            action_registry.run_action(action_name, self.client, waypoint.name)
-
-    def _verify_navigation_mode(self) -> None:
-        try:
-            mode = self.client.get_mode()
-            if mode != 2:
-                logger.warning(
-                    "Robot is NOT in navigation mode (mode=%d). "
-                    "Navigation commands may fail.",
-                    mode,
-                )
-            else:
-                logger.info("Robot confirmed in navigation mode.")
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Could not verify robot mode: %s", exc)
+    def _run_actions(self, wp: Waypoint) -> None:
+        for name in wp.actions:
+            action_registry.run_action(name, self.client, wp.name)

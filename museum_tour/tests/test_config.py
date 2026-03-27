@@ -9,7 +9,7 @@ import yaml
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from config import load_config, Config, Waypoint, RobotConfig, TourConfig
+from config import load_config, Config, Waypoint, RobotConfig
 
 
 # ---------------------------------------------------------------------------
@@ -84,8 +84,6 @@ class TestLoadConfig:
         cfg = load_config(cfg_path)
         assert cfg.robot.nav_poll_interval == pytest.approx(1.0)
         assert cfg.robot.nav_timeout == pytest.approx(120.0)
-        assert cfg.tour.wait_for_input is False
-        assert cfg.tour.input_mode == "cli"
 
     def test_tour_overrides(self, tmp_path):
         cfg_path = write_yaml(tmp_path, """
@@ -104,9 +102,6 @@ class TestLoadConfig:
         """)
         cfg = load_config(cfg_path)
         assert cfg.robot.nav_timeout == pytest.approx(60.0)
-        assert cfg.tour.wait_for_input is True
-        assert cfg.tour.input_mode == "button"
-        assert cfg.tour.button_event_code == 999
 
     def test_actions_loaded(self, tmp_path):
         cfg_path = write_yaml(tmp_path, """
