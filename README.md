@@ -11,10 +11,10 @@ Run tour controller as a MCP server:
 
 ```bash
 # stdio mode (default)
-python3 -m museum_tour.mcp_server --config waypoints.yaml
+python3 museum_tour/mcp_server.py --config waypoints.yaml
 
 # streamable-http mode
-python3 -m museum_tour.mcp_server \
+python3 museum_tour/mcp_server.py \
     --config waypoints.yaml \
     --transport streamable-http \
     --host-mcp 0.0.0.0 \
