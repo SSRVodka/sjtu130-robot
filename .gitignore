@@ -212,4 +212,10 @@ __marimo__/
 *.7z
 *.tar.gz
 *.tar.xz
+*.db
+
+# personal config for agent
+agent/config/*.yaml
+# except default.yaml
+!agent/config/default.yaml
 
