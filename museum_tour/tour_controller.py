@@ -101,7 +101,12 @@ class TourController:
             return False
         self._next_target = waypoint_name
         self._interrupt.set()            # wake the dwell loop / unblock idle wait
-        self.client.cancel_navigation()  # unblock wait_for_arrival if navigating
+        # NOTE: bug in REEMAN server: If you use `cancel_navigation` when the app is not
+        # in the “navigating” state, the next call to `nav_status` will always return `CANCELLED`
+        # (regardless of whether a new navigation destination was set in the meantime, and regardless of the wait time).
+        # see <img src="figs/prob_chassis.png" />
+        # So we remove the cancel_navigation call in `jump_to` to avoid this bug.
+        # self.client.cancel_navigation()  # unblock wait_for_arrival if navigating
         if self._audio:
             self._audio.stop()
         logger.info("jump_to('%s') requested.", waypoint_name)
@@ -222,7 +227,7 @@ class TourController:
         
         logger.info("Waiting for REEMAN server to respond...")
         # NOTE: do NOT remove this. REEMAN server needs time to update navigation status
-        time.sleep(1)
+        time.sleep(2)
         logger.info("Waiting for arrival...")
 
         return self.client.wait_for_arrival(
