@@ -1,4 +1,5 @@
 #!/bin/sh
+# RUN ON OpenHarmonyOS Robot
 
 cd /data
 
