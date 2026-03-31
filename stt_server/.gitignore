@@ -1,0 +1,4 @@
+!bin/aarch64/*.so
+bin/x86_64/
+root/
+native-build/

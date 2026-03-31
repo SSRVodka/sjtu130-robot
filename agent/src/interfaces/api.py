@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import subprocess
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -140,10 +141,19 @@ def create_app(
     cfg: AgentConfig,
     mcp: MCPManager | None = None,
     mem: Memory | None = None,
+    stt_proc: subprocess.Popen | None = None,
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         yield
+        if stt_proc is not None and stt_proc.poll() is None:
+            logger.info("Stopping stt_server (pid=%d)", stt_proc.pid)
+            stt_proc.terminate()
+            try:
+                stt_proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                stt_proc.kill()
+                stt_proc.wait()
         if mcp is not None:
             await mcp.stop()
         if mem is not None:

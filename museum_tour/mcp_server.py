@@ -1,33 +1,43 @@
 """mcp_server.py — MCP Server exposing museum tour probe functionality.
 
-Provides three tools mirroring the HTTP probe endpoints:
+Provides three MCP tools mirroring the HTTP probe endpoints:
   - get_status   (GET /status)
   - start_tour   (PUT /tour?dst=...)
   - reset_tour   (PUT /reset)
 
-Supported transports:
+The probe HTTP server (ThreadingHTTPServer) can be started simultaneously on a
+separate port so that both MCP and plain HTTP clients can control the same
+controller.
+
+Supported MCP transports:
   - stdio
   - streamable-http
 
-Transport and listen address are controlled entirely by command-line flags so
-that the server can be started without touching the YAML config.
-
-Usage (stdio)
--------------
+Usage
+-----
+    # MCP over stdio + probe on :8080
     python -m museum_tour.mcp_server --config waypoints.yaml
 
-Usage (streamable-http)
------------------------
+    # MCP over streamable-http + probe on :8080
     python -m museum_tour.mcp_server --config waypoints.yaml \\
-        --transport streamable-http --host 0.0.0.0 --port 8080
+        --transport streamable-http --host-mcp 0.0.0.0 --port 8000
+
+    # MCP only, no probe
+    python -m museum_tour.mcp_server --config waypoints.yaml --no-probe
+
+    # Override robot host
+    python -m museum_tour.mcp_server --config waypoints.yaml \\
+        --host 192.168.1.100
 """
 
 from __future__ import annotations
 
 import argparse
 import logging
+import signal
 import sys
-from typing import Any
+import threading
+from typing import TYPE_CHECKING, Any
 
 from mcp.server.fastmcp import FastMCP
 
@@ -35,36 +45,19 @@ from config import load_config
 from robot_client import RobotClient
 from tour_controller import TourController
 
+if TYPE_CHECKING:
+    from probe import ProbeServer
+
 logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# FastMCP app (built once, run twice depending on transport)
+# Tool registration
 # ---------------------------------------------------------------------------
 
-def build_mcp_app(config_path: str, robot_host: str | None) -> FastMCP:
-    """Construct and return a FastMCP instance wired to the tour controller."""
-    config = load_config(config_path)
-    if robot_host:
-        config.robot.host = robot_host
-        logger.info("Robot host overridden to %s", robot_host)
-
-    client = RobotClient(host=config.robot.host)
-    controller = TourController(config=config, client=client)
-    controller.start()
-
-    mcp = FastMCP(
-        name="museum-tour",
-        instructions=(
-            "Museum guided-tour controller for a REEMAN robot. "
-            "Use get_status to inspect the current waypoint, audio state, "
-            "and robot pose. Use start_tour to begin or restart a tour "
-            "from a named waypoint. Use reset_tour to abort the tour "
-            "and return the controller to idle."
-        ),
-        host="0.0.0.0",
-        port=8000,
-    )
+def register_mcp_tools(mcp: FastMCP, controller: TourController) -> None:
+    """Register get_status / start_tour / reset_tour on an existing FastMCP."""
+    client = controller.client
 
     # ------------------------------------------------------------------
     # Tool: get_status
@@ -134,8 +127,6 @@ def build_mcp_app(config_path: str, robot_host: str | None) -> FastMCP:
         controller.reset()
         return {"status": "ok"}
 
-    return mcp
-
 
 # ---------------------------------------------------------------------------
 # Entry point
@@ -146,7 +137,7 @@ def _setup_logging(level: str) -> None:
         level=getattr(logging, level.upper(), logging.INFO),
         format="%(asctime)s [%(levelname)-8s] %(name)s — %(message)s",
         datefmt="%H:%M:%S",
-        stream=sys.stdout,
+        stream=sys.stderr,
     )
 
 
@@ -163,6 +154,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--host", metavar="IP",
         help="Override the robot host IP from the config file.",
     )
+    # MCP transport
     p.add_argument(
         "--transport",
         default="stdio",
@@ -177,6 +169,20 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--port", type=int, default=8000, metavar="N",
         help="TCP port the MCP server listens on (streamable-http only).",
     )
+    # Probe HTTP server
+    p.add_argument(
+        "--no-probe", dest="no_probe", action="store_true",
+        help="Disable the HTTP probe server.",
+    )
+    p.add_argument(
+        "--probe-host", default="0.0.0.0", metavar="IP",
+        help="Address the HTTP probe server listens on.",
+    )
+    p.add_argument(
+        "--probe-port", type=int, default=8080, metavar="N",
+        help="TCP port the HTTP probe server listens on.",
+    )
+    # Logging
     p.add_argument(
         "--log-level", default="INFO",
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
@@ -188,8 +194,59 @@ def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     _setup_logging(args.log_level)
 
-    mcp = build_mcp_app(args.config, args.host)
+    # Build controller (shared by both MCP and probe)
+    config = load_config(args.config)
+    if args.host:
+        config.robot.host = args.host
+        logger.info("Robot host overridden to %s", args.host)
 
+    client = RobotClient(host=config.robot.host)
+    controller = TourController(config=config, client=client)
+    controller.start()
+
+    # Build FastMCP and register tools
+    mcp = FastMCP(
+        name="museum-tour",
+        instructions=(
+            "Museum guided-tour controller for a REEMAN robot. "
+            "Use get_status to inspect the current waypoint, audio state, "
+            "and robot pose. Use start_tour to begin or restart a tour "
+            "from a named waypoint. Use reset_tour to abort the tour "
+            "and return the controller to idle."
+        ),
+        host="0.0.0.0",
+        port=8000,
+    )
+    register_mcp_tools(mcp, controller)
+
+    # Start probe HTTP server (daemon thread)
+    probe_server: "ProbeServer | None" = None
+    if not args.no_probe:
+        from probe import ProbeServer
+        probe_server = ProbeServer(
+            host=args.probe_host,
+            port=args.probe_port,
+            controller=controller,
+        )
+        probe_server.start()
+        logger.info(
+            "Probe HTTP server listening on http://%s:%d  "
+            "(GET /status  PUT /tour?dst=...  PUT /reset)",
+            args.probe_host, args.probe_port,
+        )
+
+    # Graceful shutdown
+    def _on_signal(sig: int, _frame: object) -> None:
+        logger.info("Signal %d received — shutting down.", sig)
+        controller.shutdown()
+        if probe_server:
+            probe_server.stop()
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT,  _on_signal)
+    signal.signal(signal.SIGTERM, _on_signal)
+
+    # Run MCP transport (blocks until server exits)
     if args.transport == "streamable-http":
         mcp.settings.host = args.mcp_host
         mcp.settings.port = args.port
@@ -202,6 +259,9 @@ def main(argv: list[str] | None = None) -> int:
         logger.info("Starting MCP server (stdio) ...")
         mcp.run(transport="stdio")
 
+    # Unreachable for stdio; reached for streamable-http when server exits
+    if probe_server:
+        probe_server.stop()
     return 0
 
 

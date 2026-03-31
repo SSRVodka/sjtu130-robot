@@ -49,3 +49,24 @@ interfaces:
     host: "0.0.0.0"
     port: 8000
     api_key: null            # null = no authentication required
+
+############# STT & TTS only valid in Web API mode ##############
+
+stt:
+  enabled: true
+  host: "0.0.0.0"
+  port: 8081
+  args:
+    # agent-url is configured by host and port above
+    model: "models/sense-voice-small.gguf"
+    language: "auto"
+    no-gpu: null
+
+tts:
+  enabled: true
+  api_key: "填入你的阿里云 DashScope API Key"
+  model: "qwen3-tts-flash"
+  voice: "Cherry"
+  language: "Chinese"
+  phone_ip: "192.168.1.125"
+  phone_port: 9999

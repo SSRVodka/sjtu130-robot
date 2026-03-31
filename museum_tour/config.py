@@ -27,6 +27,7 @@ class Pose:
 @dataclass
 class Waypoint:
     name: str
+    description: str
     dwell_time: float          # seconds
     audio_file: str
     play_audio_when_walking: bool = False
@@ -119,6 +120,7 @@ def load_config(path: str | Path) -> Config:
         waypoints.append(
             Waypoint(
                 name=str(wp_raw["name"]),
+                description=str(wp_raw["description"]),
                 dwell_time=float(wp_raw.get("dwell_time", 30)),
                 audio_file=str(wp_raw["audio_file"]),
                 play_audio_when_walking=bool(wp_raw.get("play_audio_when_walking", False)),

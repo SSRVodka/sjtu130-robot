@@ -219,3 +219,7 @@ agent/config/*.yaml
 # except default.yaml
 !agent/config/default.yaml
 
+tmp/
+*.mp3
+*.gguf
+

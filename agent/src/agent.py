@@ -44,6 +44,7 @@ class Agent:
             config.name,
             config.max_iterations,
         )
+        logger.info("Agent registry info: %s", self._registry.get_registry_info())
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -120,6 +121,7 @@ class Agent:
                 iterations,
                 content_preview,
             )
+            logger.info("Full response: %s", assistant_msg.get("content"))
             await self._memory.save(session_id, context[1:])
             return assistant_msg
 

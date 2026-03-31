@@ -99,6 +99,8 @@ class TourController:
         """
         if waypoint_name not in self._wp_index:
             return False
+        if self._audio:
+            self._audio.stop()
         self._next_target = waypoint_name
         self._interrupt.set()            # wake the dwell loop / unblock idle wait
         # NOTE: bug in REEMAN server: If you use `cancel_navigation` when the app is not
@@ -107,8 +109,6 @@ class TourController:
         # see <img src="figs/prob_chassis.png" />
         # So we remove the cancel_navigation call in `jump_to` to avoid this bug.
         # self.client.cancel_navigation()  # unblock wait_for_arrival if navigating
-        if self._audio:
-            self._audio.stop()
         logger.info("jump_to('%s') requested.", waypoint_name)
         return True
     

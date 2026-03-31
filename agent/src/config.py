@@ -98,6 +98,24 @@ class InterfacesConfig(BaseModel):
     api: APIConfig = Field(default_factory=APIConfig)
 
 
+class STTServerConfig(BaseModel):
+    host: str = "0.0.0.0"
+    port: int = 8081
+    enabled: bool = True
+    args: dict[str, str | None] = Field(default_factory=dict)
+
+
+class TTSConfig(BaseModel):
+    api_key: str = ""
+    url: str = "https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation"
+    model: str = "qwen3-tts-flash"
+    voice: str = "Cherry"
+    language: str = "Chinese"
+    phone_ip: str = "192.168.1.125"
+    phone_port: int = 9999
+    enabled: bool = True
+
+
 class AgentConfig(BaseModel):
     name: str = "Agent"
     system_prompt: str = "You are a helpful assistant."
@@ -106,6 +124,8 @@ class AgentConfig(BaseModel):
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
     tools: ToolsConfig = Field(default_factory=ToolsConfig)
     interfaces: InterfacesConfig = Field(default_factory=InterfacesConfig)
+    stt: STTServerConfig | None = Field(default=None)
+    tts: TTSConfig | None = Field(default=None)
 
 
 # ---------------------------------------------------------------------------

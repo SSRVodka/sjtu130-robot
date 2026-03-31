@@ -14,7 +14,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import sys
+import os
+import platform
+import subprocess
+import time
 
 import click
 import uvicorn
@@ -25,8 +28,55 @@ from src import (
 from src.interfaces.api import create_app
 from src.interfaces.cli import run_cli, _run_once
 from src.multimodal import build_user_message
+from src.tts import (
+    apply_config as apply_tts_config,
+    get_tool_definition as tts_tool_definition,
+    call_tool as tts_call_tool,
+)
+
+STT_SERVER_BIN = os.path.join(
+    os.path.dirname(__file__), "..", "stt_server", "bin", platform.machine(), "stt-server"
+)
 
 logger = logging.getLogger("agent.main")
+
+
+# STT server will only be started on web API server.
+def _start_stt_server(stt_args: dict[str, str | None]) -> subprocess.Popen | None:
+    if not os.path.isfile(STT_SERVER_BIN):
+        logger.warning("stt_server binary not found at '%s' – skipping", STT_SERVER_BIN)
+        return None
+
+    args_list = []
+    for k, v in stt_args.items():
+        args_list.append(f"--{k}")
+        if v is not None:
+            args_list.append(v)
+
+    full_cmd = [STT_SERVER_BIN, *args_list]
+    logger.info("Starting stt_server: %s", " ".join(full_cmd))
+
+    try:
+        # redirect stderr to current command line (stderr=None)
+        proc = subprocess.Popen(
+            full_cmd,
+            stdout=None,      # inherit parent process stdout (output to command line)
+            stderr=None,      # inherit parent process stderr (output to current command line)
+            text=True
+        )
+    except Exception as e:
+        logger.error("Failed to start stt_server process: %s", str(e))
+        return None
+
+    # check if the process is alive immediately after starting
+    exit_code = proc.poll()
+    if exit_code is not None:
+        logger.error("stt_server process exited immediately! Exit code: %d", exit_code)
+        return None
+    
+    logger.info("stt_server started successfully (PID: %d)", proc.pid)
+    return proc
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -70,6 +120,18 @@ async def _build_app(config_path: str) -> tuple[Agent, AgentConfig, MCPManager, 
 
     llm = LLMClient(cfg.llm)
     registry = ToolRegistry(mcp_manager)
+
+    # Apply TTS config (if tts: section is present and enabled)
+    if cfg.tts is not None and cfg.tts.enabled:
+        apply_tts_config(cfg.tts.model_dump())
+        logger.info(
+            "TTS config applied – model=%s voice=%s phone=%s:%d",
+            cfg.tts.model, cfg.tts.voice, cfg.tts.phone_ip, cfg.tts.phone_port,
+        )
+        registry.register_local(tts_tool_definition(), tts_call_tool)
+    else:
+        logger.debug("TTS disabled – speak tool not registered")
+
     agent = Agent(cfg, llm, memory, registry)
 
     return agent, cfg, mcp_manager, memory
@@ -162,10 +224,21 @@ def serve(
 
     async def _main():
         agent, cfg, mcp, mem = await _build_app(ctx.obj["config_path"])
-        app = create_app(agent, cfg, mcp=mcp, mem=mem)
         api_cfg = cfg.interfaces.api
         listen_host = host or api_cfg.host
         listen_port = port or api_cfg.port
+
+        if cfg.stt is not None and cfg.stt.enabled:
+            cfg.stt.args["host"] = cfg.stt.host
+            cfg.stt.args["port"] = str(cfg.stt.port)
+            cfg.stt.args["agent-url"] = f"http://{listen_host}:{listen_port}"
+            stt_proc = _start_stt_server(cfg.stt.args)
+        else:
+            logger.info("STT server disabled – skipping")
+            stt_proc = None
+        
+        app = create_app(agent, cfg, mcp=mcp, mem=mem, stt_proc=stt_proc)
+        time.sleep(1)
         click.echo(
             f"Starting server on http://{listen_host}:{listen_port}  "
             f"(model={cfg.llm.model})"
