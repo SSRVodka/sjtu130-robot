@@ -13,13 +13,17 @@ requiring re-imports.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
+import time
 import logging
+import os
 import socket
 from typing import Any
 
 import requests
+import yaml
 
 from .tools.base import ToolDefinition
 
@@ -28,6 +32,12 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Defaults – all overridden by applying TTSConfig values to this dict
 # ---------------------------------------------------------------------------
+
+WAYPOINT_CONFIG: dict[str, Any] = {}
+WAYPOINT_CONFIG_FILE = os.path.join(os.path.dirname(__file__), "..", "..", "museum_tour", "waypoints.yaml")
+with open(WAYPOINT_CONFIG_FILE, "r") as f:
+    WAYPOINT_CONFIG = yaml.safe_load(f)
+PROBE_URL = f"http://{WAYPOINT_CONFIG['probe']['host']}:{WAYPOINT_CONFIG['probe']['port']}"
 
 _tts_cfg: dict[str, Any] = {
     "api_key": "",
@@ -39,11 +49,77 @@ _tts_cfg: dict[str, Any] = {
     "phone_port": 9999,
 }
 
+# Context Switch States
+# NOTE: Agent 调用 speak 后框架自动记录当前 waypoint 并向 controller 发送 reset 指令，防止与 agent 的讲话冲突。我们称为 Context Switch
+# Speak 结束后框架向 controller 发送 jump_to 指令，恢复到原来的 waypoint。
+CONTEXT_SWITCH_STATE = {
+    "waypoint": None, # waypoint name
+    "is_context_switch": False, # whether is in context switch
+}
+
 
 def apply_config(cfg: dict[str, Any]) -> None:
     """Merge values from a TTSConfig dict into the runtime config."""
     _tts_cfg.update({k: v for k, v in cfg.items() if v is not None})
 
+
+def enter_context_switch() -> bool:
+    """
+    Fetch current waypoint from probe and reset to idle state.
+    Returns True if successful, False otherwise.
+    """
+    if CONTEXT_SWITCH_STATE["is_context_switch"]:
+        logger.warning("tts.enter_context_switch – already in context switch mode: current waypoint=%s will be overwritten",
+            CONTEXT_SWITCH_STATE["waypoint"])
+
+    try:
+        resp = requests.get(f"{PROBE_URL}/status", timeout=5)
+        resp.raise_for_status()
+        data = resp.json()
+        waypoint_num_id = data.get("current_waypoint", "")
+    except Exception as e:
+        logger.error("tts.enter_context_switch – failed to GET /status: %s", e)
+        return False
+
+    if not waypoint_num_id:
+        logger.warning("tts.enter_context_switch – no current waypoint reported by probe")
+
+    try:
+        resp = requests.put(f"{PROBE_URL}/reset", timeout=5)
+        resp.raise_for_status()
+    except Exception as e:
+        logger.error("tts.enter_context_switch – failed to PUT /reset: %s", e)
+        return False
+
+    CONTEXT_SWITCH_STATE["waypoint"] = waypoint_num_id
+    CONTEXT_SWITCH_STATE["is_context_switch"] = True
+    logger.info("tts.enter_context_switch – saved waypoint=%s", waypoint_num_id)
+    return True
+
+def exit_context_switch() -> bool:
+    """
+    Exit context switch mode and jump back to the saved waypoint.
+    Returns True if successful, False otherwise.
+    """
+    if not CONTEXT_SWITCH_STATE["is_context_switch"]:
+        logger.warning("tts.exit_context_switch – not in context switch mode, skipping")
+        return False
+
+    last_wp = CONTEXT_SWITCH_STATE["waypoint"]
+    if not last_wp:
+        logger.warning("tts.exit_context_switch – no saved waypoint, skipping jump_to")
+
+    try:
+        resp = requests.put(f"{PROBE_URL}/tour?dst={last_wp}", timeout=5)
+        resp.raise_for_status()
+    except Exception as e:
+        logger.error("tts.exit_context_switch – failed to PUT /tour?dst=%s: %s", last_wp, e)
+        return False
+
+    CONTEXT_SWITCH_STATE["waypoint"] = None
+    CONTEXT_SWITCH_STATE["is_context_switch"] = False
+    logger.info("tts.exit_context_switch – jumped back to waypoint=%s", last_wp)
+    return True
 
 # ---------------------------------------------------------------------------
 # Core TTS logic
@@ -65,6 +141,8 @@ async def speak(text: str) -> str:
     port: int = _tts_cfg.get("phone_port", 9999)
 
     logger.info("tts.speak – text=%r -> %s:%d", text[:60], ip, port)
+
+    enter_context_switch()
 
     # --- TCP socket to phone ------------------------------------------------
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -91,6 +169,10 @@ async def speak(text: str) -> str:
         },
         "parameters": {"format": "pcm"},
     }
+
+    total_bytes = 0
+    # first frame audio playback start time
+    playback_start_time: float | None = None
 
     try:
         response = requests.post(
@@ -135,11 +217,15 @@ async def speak(text: str) -> str:
 
             # Decode base64 → raw PCM bytes → send to phone
             pcm_bytes = base64.b64decode(audio_b64)
+
+            if playback_start_time is None:
+                playback_start_time = time.monotonic()
+
             sock.sendall(pcm_bytes)
+            total_bytes += len(pcm_bytes)
             frame_count += 1
 
         logger.info("tts.speak done – %d audio frame(s) sent", frame_count)
-        return f"[ok] Sent {frame_count} audio frame(s) to {ip}:{port}"
 
     except requests.exceptions.RequestException as e:
         msg = f"[error] TTS request exception: {e}"
@@ -151,6 +237,20 @@ async def speak(text: str) -> str:
         return msg
     finally:
         sock.close()
+
+    # Block until complete playing audio
+    if playback_start_time is not None and total_bytes > 0:
+        _BYTES_PER_SECOND = 24000 * 2 * 1  # 48000
+        total_duration = total_bytes / _BYTES_PER_SECOND
+        elapsed = time.monotonic() - playback_start_time
+        remaining = total_duration - elapsed
+        if remaining > 0:
+            logger.info("tts.speak – waiting %.2fs for playback to finish", remaining)
+            await asyncio.sleep(remaining)
+    
+    exit_context_switch()
+
+    return f"[ok] Sent {frame_count} audio frame(s) to {ip}:{port}"
 
     # logger.info("tts.speak – text=%r", text)
     # return "[ok] TTS request sent"
