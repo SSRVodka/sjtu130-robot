@@ -100,14 +100,14 @@ def register_mcp_tools(mcp: FastMCP, controller: TourController) -> None:
             "Use get_status to discover the list of available waypoints."
         ),
     )
-    def start_tour(waypoint_name: str) -> dict[str, Any]:
-        if controller.jump_to(waypoint_name):
-            return {"status": "ok", "jumping_to": waypoint_name}
+    def start_tour(waypoint_id: str) -> dict[str, Any]:
+        if controller.jump_to(waypoint_id):
+            return {"status": "ok", "jumping_to": waypoint_id}
         else:
             known = [wp.name for wp in controller.config.waypoints]
             return {
                 "status": "error",
-                "message": f"Waypoint '{waypoint_name}' not found.",
+                "message": f"Waypoint '{waypoint_id}' not found.",
                 "available_waypoints": known,
             }
 
