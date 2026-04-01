@@ -21,6 +21,14 @@ python3 museum_tour/mcp_server.py \
     --port 8000
 ```
 
+**<u>Main Entry</u>** on OpenHarmony Device: `./scripts/boot_agent_block.sh`.
+
 
 About the agent: [The README for agent](./agent/README.md)
+
+About the ArkUI controller (frontend) on HarmonyOS 6+: [sjtu130-robot-ui](https://github.com/SSRVodka/sjtu130-robot-ui.git). The UI supports:
+
+- Manual Navigation to Waypoints;
+- STT -> Agent -> TTS;
+- STT -> Agent -> AI Navigation;
 
