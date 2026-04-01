@@ -199,6 +199,7 @@ static std::vector<float> decode_wav(const std::vector<char> &buf) {
 // Convert any audio format to float PCM via FFmpeg libraries (no subprocess).
 // Replicates: ffmpeg -y -i <in> -ac 1 -ar SENSE_VOICE_SAMPLE_RATE -sample_fmt s16 <out.wav>
 // then the decode_wav(s16 WAV) → float path.
+// ffmpeg version 4
 static std::vector<float> decode_via_ffmpeg(const std::vector<char> &data) {
     // ── Memory-backed AVIOContext ─────────────────────────────────────────────
     struct MemIO { const uint8_t *start, *ptr, *end; };
