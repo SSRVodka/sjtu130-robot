@@ -32,3 +32,14 @@ About the ArkUI controller (frontend) on HarmonyOS 6+: [sjtu130-robot-ui](https:
 - STT -> Agent -> TTS;
 - STT -> Agent -> AI Navigation;
 
+### Techs
+
+1. Local inference of STT models on OpenHarmony edge devices;
+
+2. Qwen cloud-based TTS models;
+
+3. Agent framework + MCP tools;
+
+
+**All code can run on OpenHarmony and HarmonyOS devices**.
+
