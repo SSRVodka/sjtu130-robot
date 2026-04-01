@@ -43,3 +43,8 @@ About the ArkUI controller (frontend) on HarmonyOS 6+: [sjtu130-robot-ui](https:
 
 **All code can run on OpenHarmony and HarmonyOS devices**.
 
+
+### Credits
+
+- Local STT inference using [sense-voice.cpp](https://github.com/lovemefan/SenseVoice.cpp);
+
