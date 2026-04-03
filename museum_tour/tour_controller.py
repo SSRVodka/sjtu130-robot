@@ -27,6 +27,10 @@ from robot_client import RobotClient
 
 logger = logging.getLogger(__name__)
 
+# import actions of video player
+import video_controller
+logger.info(f"video commands loaded: {video_controller.VideoCmd}")
+
 
 # ---------------------------------------------------------------------------
 # Shared state (read by probe server from another thread)
@@ -171,36 +175,35 @@ class TourController:
             # 1. Navigate
             logger.info("Stop %d/%d — navigating to '%s'.", start_idx + 1, total, wp.name)
             self.state.update(phase="navigating", waypoint=wp.name)
-            nav_start_time = time.monotonic()
+            # block operation
             if not self._navigate(wp):
                 logger.warning("Navigation failed at '%s', skipping.", wp.name)
                 start_idx += 1
                 continue
             start_idx += 1
-            nav_duration = time.monotonic() - nav_start_time
 
             if self._interrupt.is_set():
                 return
 
-            # 2. Pre-dwell actions
-            self._run_actions(wp)
-            if self._interrupt.is_set():
-                return
-
-            # 3. Audio + dwell
-            actual_dwell_time = wp.dwell_time
+            # 2. Audio + dwell
             self.state.update(phase="dwelling")
             if not wp.play_audio_when_walking:
                 logger.info("Playing audio '%s' at '%s'.",
                     wp.audio_file, wp.name)
                 self._audio.play()
                 self.state.update(audio_playing=True)
-            else:
-                # adjust dwell time if playing audio when walking (considering navigation time)
-                actual_dwell_time = max(0, wp.dwell_time - nav_duration) + 2
 
-            logger.info("Dwelling for %s seconds at '%s'.", actual_dwell_time, wp.name)
-            self._dwell(actual_dwell_time)
+            logger.info("Waiting for audio player...")
+            if not self._audio.wait(self._interrupt):
+                return
+            if wp.dwell_time > 0:
+                logger.info("Dwelling for %s seconds at '%s'.", wp.dwell_time, wp.name)
+                self._dwell(wp.dwell_time)
+
+            # 3. post-audio actions
+            self._run_actions(wp, self._interrupt)
+            if self._interrupt.is_set():
+                return
 
             self._audio.stop()
             self._audio = None
@@ -244,7 +247,7 @@ class TourController:
                 logger.debug("--- Dwell interrupted ---")
                 return  # interrupted
 
-    def _run_actions(self, wp: Waypoint) -> None:
+    def _run_actions(self, wp: Waypoint, interrupt: threading.Event) -> None:
         for name in wp.actions:
             logger.info("Running action '%s' at '%s'.", name, wp.name)
-            action_registry.run_action(name, self.client, wp.name)
+            action_registry.run_action(name, self.client, wp.name, interrupt)

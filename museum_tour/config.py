@@ -121,7 +121,7 @@ def load_config(path: str | Path) -> Config:
             Waypoint(
                 name=str(wp_raw["name"]),
                 description=str(wp_raw["description"]),
-                dwell_time=float(wp_raw.get("dwell_time", 30)),
+                dwell_time=float(wp_raw.get("dwell_time", 0)),
                 audio_file=str(wp_raw["audio_file"]),
                 play_audio_when_walking=bool(wp_raw.get("play_audio_when_walking", False)),
                 actions=list(wp_raw.get("actions") or []),

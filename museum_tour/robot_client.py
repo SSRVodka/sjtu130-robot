@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 # Default timeout for individual HTTP requests (seconds)
 _HTTP_TIMEOUT = 3
+_FUCK_REEMAN = False
 
 
 # ---------------------------------------------------------------------------
@@ -202,8 +203,13 @@ class RobotClient:
 
         Returns True if the robot arrived successfully, False otherwise.
         """
+        global _FUCK_REEMAN
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
+            if not _FUCK_REEMAN:
+                self.get_nav_status()
+                _FUCK_REEMAN = True
+                time.sleep(0.5)
             status = self.get_nav_status()
             if status is None:
                 time.sleep(poll_interval)

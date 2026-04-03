@@ -31,7 +31,7 @@ class AudioPlayer:
     def stop(self) -> None:
         raise NotImplementedError
     @abstractmethod
-    def wait(self) -> None:
+    def wait(self, interrupt: threading.Event) -> bool:
         raise NotImplementedError
     @property
     def is_playing(self) -> bool:
@@ -92,10 +92,11 @@ class LocalAudioPlayer(AudioPlayer):
             self._process.terminate()
             logger.debug("Stopped audio: %s", self.audio_file)
 
-    def wait(self) -> None:
-        """Block until playback finishes."""
+    def wait(self, interrupt: threading.Event) -> bool:
+        """Block until playback finishes or interrupt is set."""
         if self._thread:
             self._thread.join()
+        return True
 
     @property
     def is_playing(self) -> bool:
@@ -156,11 +157,16 @@ class RemoteAudioPlayer(AudioPlayer):
     def stop(self) -> None:
         self._request("PUT", self._url("/stop"))
 
-    def wait(self) -> None:
+    def wait(self, interrupt: threading.Event) -> bool:
+        """Returns True if not interrupted"""
         while True:
             time.sleep(1)
+            if (interrupt.is_set()):
+                logger.warning("audio player wait interrupted")
+                return False
             if not self.is_playing:
                 break
+        return True
 
     @property
     def is_playing(self) -> bool:

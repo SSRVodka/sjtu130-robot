@@ -14,6 +14,7 @@ function) and keep the signature::
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Callable, Dict
 
 from robot_client import RobotClient
@@ -21,25 +22,25 @@ from robot_client import RobotClient
 logger = logging.getLogger(__name__)
 
 # action_name -> callable
-_REGISTRY: Dict[str, Callable[[RobotClient, str], None]] = {}
+_REGISTRY: Dict[str, Callable[[RobotClient, str, threading.Event], None]] = {}
 
 
 def register(name: str) -> Callable:
     """Decorator that registers a function under *name*."""
-    def decorator(fn: Callable[[RobotClient, str], None]) -> Callable:
+    def decorator(fn: Callable[[RobotClient, str, threading.Event], None]) -> Callable:
         _REGISTRY[name] = fn
         return fn
     return decorator
 
 
-def run_action(name: str, client: RobotClient, waypoint_name: str) -> None:
+def run_action(name: str, client: RobotClient, waypoint_name: str, interrupt: threading.Event) -> None:
     """Execute a registered action by name, or warn if unknown."""
     fn = _REGISTRY.get(name)
     if fn is None:
         logger.warning("Unknown action '%s' at waypoint '%s' — skipping.", name, waypoint_name)
         return
     logger.info("Running action '%s' at '%s'.", name, waypoint_name)
-    fn(client, waypoint_name)
+    fn(client, waypoint_name, interrupt)
 
 
 # ---------------------------------------------------------------------------
@@ -48,21 +49,21 @@ def run_action(name: str, client: RobotClient, waypoint_name: str) -> None:
 
 
 @register("greet")
-def action_greet(client: RobotClient, waypoint_name: str) -> None:
+def action_greet(client: RobotClient, waypoint_name: str, interrupt: threading.Event) -> None:
     """Wave or trigger a greeting animation/sound."""
     # TODO: send serial command or HTTP request to actuate greeting gesture
     logger.info("[STUB] greet at '%s'", waypoint_name)
 
 
 @register("farewell")
-def action_farewell(client: RobotClient, waypoint_name: str) -> None:
+def action_farewell(client: RobotClient, waypoint_name: str, interrupt: threading.Event) -> None:
     """Play a farewell gesture at the end of the tour."""
     # TODO: trigger farewell animation
     logger.info("[STUB] farewell at '%s'", waypoint_name)
 
 
 @register("display_artifact")
-def action_display_artifact(client: RobotClient, waypoint_name: str) -> None:
+def action_display_artifact(client: RobotClient, waypoint_name: str, interrupt: threading.Event) -> None:
     """Signal an external display or projector to show artifact info."""
     # TODO: send HTTP/serial signal to AV system
     logger.info("[STUB] display_artifact at '%s'", waypoint_name)

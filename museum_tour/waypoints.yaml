@@ -18,247 +18,216 @@ probe:
 waypoints:
   - name: "00"
     description: "欢迎词（初始位置）"
-    dwell_time: 21
     audio_file: "mp4s/00-greet.wav"
     pose: {x: 30.21, y: 9.87, theta: 0.89}
 
   - name: "01"
     description: "序章（位置不变）"
-    dwell_time: 37
     audio_file: "mp4s/01-prologue.wav"
     pose: {x: 30.21, y: 9.87, theta: 0.89}
 
   - name: "02"
     description: "总书记回信介绍"
-    dwell_time: 36
     audio_file: "mp4s/02-great-encouragement.wav"
     pose: {x: 32.7, y: 6.54, theta: -3.06}
 
   - name: "03"
     description: "《何以交大》视频介绍"
-    dwell_time: 14
     audio_file: "mp4s/03-how-sjtu-video.wav"
     pose: {x: 30.21, y: 3.54, theta: 1.3}
+    actions:
+      - "play_entry_main_video"
 
   - name: "04"
     description: "展馆整体介绍"
-    dwell_time: 36
     audio_file: "mp4s/04-intro-chapters.wav"
     play_audio_when_walking: true
     pose: {x: 29.8, y: 5.66, theta: -1.48}
   
   - name: "05"
     description: "第一章：光辉历程"
-    dwell_time: 69
     audio_file: "mp4s/05-chapter1.wav"
     play_audio_when_walking: true
     pose: {x: 27.18, y: 5.78, theta: -0.51}
   
   - name: "06"
     description: "1-extra：改革先锋"
-    dwell_time: 52
     audio_file: "mp4s/06-reform-pioneers.wav"
     play_audio_when_walking: true
     pose: {x: 28.83, y: -0.64, theta: 2.38}
 
   - name: "07"
     description: "第二章：向质图强"
-    dwell_time: 65
     audio_file: "mp4s/07-chapter2.wav"
     pose: {x: 27.03, y: -1.61, theta: 1.77}
 
   - name: "08"
     description: "2-extra-1：面向国家重大需求"
-    dwell_time: 27
     audio_file: "mp4s/08-meets-country-needs.wav"
     pose: {x: 20.55, y: -1.99, theta: 1.41}
 
   - name: "09"
     description: "2-extra-2：交大挖泥船"
-    dwell_time: 46
     audio_file: "mp4s/09-dig-dirt.wav"
     pose: {x: 20.55, y: -1.99, theta: 2.85}
 
   - name: "10"
     description: "2-extra-3：服务海洋强国战略"
-    dwell_time: 26
     audio_file: "mp4s/10-big-ocean-moving.wav"
     play_audio_when_walking: true
     pose: {x: 18.76, y: 6.93, theta: -0.95}
 
   - name: "11"
     description: "2-extra-4：深远海大设施"
-    dwell_time: 59
     audio_file: "mp4s/11-deep-ocean-platform.wav"
     pose: {x: 18.76, y: 6.93, theta: -0.95}
 
   - name: "12"
     description: "2-extra-5：服务制造强国战略"
-    dwell_time: 27
     audio_file: "mp4s/12-create.wav"
     pose: {x: 22.17, y: 5.54, theta: 2.57}
 
   - name: "13"
     description: "面向世界科技前沿（论文墙）"
-    dwell_time: 77
     audio_file: "mp4s/13-world-frontier.wav"
     pose: {x: 20.61, y: 7.9, theta: -2.31}
 
   - name: "14"
     description: "3-extra-1：量子科技成果"
-    dwell_time: 50
     audio_file: "mp4s/14-quantum-tech.wav"
     pose: {x: 18.26, y: 8.25, theta: 1.6}
 
   - name: "15"
     description: "3-extra-2：核聚变成果"
-    dwell_time: 44
     audio_file: "mp4s/15-nuclear-fusion.wav"
     pose: {x: 13.02, y: 4.6, theta: 1.57}
 
   - name: "16"
     description: "3-extra-3：AI技术布局"
-    dwell_time: 21
     audio_file: "mp4s/16-ai-moving.wav"
     play_audio_when_walking: true
     pose: {x: 8.22, y: 8.08, theta: 2.55}
 
   - name: "17"
     description: "3-extra-4：DeepRare成果"
-    dwell_time: 39
     audio_file: "mp4s/17-deeprare.wav"
     pose: {x: 8.22, y: 8.08, theta: 2.55}
 
   - name: "18"
     description: "3-extra-5：面向人民生命健康"
-    dwell_time: 32
     audio_file: "mp4s/18-facing-people-health.wav"
     pose: {x: 13.46, y: 1.92, theta: -2.84}
 
   - name: "19"
     description: "3-extra-6：人体模型成果"
-    dwell_time: 13
     audio_file: "mp4s/19-people-model.wav"
     pose: {x: 11.81, y: 0.63, theta: 1.51}
 
   - name: "20"
     description: "3-extra-7：瑞金医院血液病团队成果"
-    dwell_time: 45
     audio_file: "mp4s/20-hospital-ruijin.wav"
     pose: {x: 13.78, y: -2.4, theta: 2.23}
 
 
   - name: "21"
     description: "3-extra-8：仁济医院成果"
-    dwell_time: 57
     audio_file: "mp4s/21-hospital-renji.wav"
     pose: {x: 13.78, y: -2.4, theta: 2.23}
   
   - name: "22"
     description: "3-extra-9：面向经济主战场"
-    dwell_time: 71
     audio_file: "mp4s/22-eco-battlefield.wav"
     play_audio_when_walking: true
     pose: {x: 8.24, y: 5.51, theta: -2.38}
 
   - name: "23"
     description: "3-extra-10：孙浩团队成果"
-    dwell_time: 31
     audio_file: "mp4s/23-eco-sunhao.wav"
     pose: {x: 8.24, y: 5.51, theta: -2.38}
 
   - name: "24"
     description: "3-extra-11：李俊团队成果"
-    dwell_time: 37
     audio_file: "mp4s/24-eco-lijun.wav"
     pose: {x: 8.24, y: 5.51, theta: -2.38}
   #
   - name: "25"
     description: "材料展台"
-    dwell_time: 32
     audio_file: "mp4s/25-material.wav"
     play_audio_when_walking: true
     pose: {x: 3.33, y: 2.12, theta: 0.37}
 
   - name: "26"
     description: "4-extra-1：丁文江团队成果"
-    dwell_time: 47
     audio_file: "mp4s/26-dingwenjiang-zengxiaoqin.wav"
     pose: {x: 3.21, y: 5.19, theta: -2.46}
     # pose: {x: 3.28, y: 4.99, theta: -2.12}
 
   - name: "27"
     description: "4-extra-2：打卡拍照"
-    dwell_time: 15
     audio_file: "mp4s/27-selfie.wav"
     pose: {x: -0.89, y: 4.68, theta: -0.2}
     # pose: {x: -1.34, y: 4.63, theta: -0.03}
   
   - name: "28"
     description: "4-extra-3：文科智慧"
-    dwell_time: 31
     audio_file: "mp4s/28-liberal-arts-wisdom.wav"
     play_audio_when_walking: true
     pose: {x: -1.3, y: 9.17, theta: -0.08}
 
   - name: "29"
     description: "4-extra-4：VR体验"
-    dwell_time: 11
     audio_file: "mp4s/29-vr.wav"
     pose: {x: -1.3, y: 9.17, theta: -0.08}
 
   - name: "30"
     description: "4-extra-5：大零号湾视频展示"
-    dwell_time: 42
     audio_file: "mp4s/30-rconvert-0-bay-video.wav"
     pose: {x: 3.33, y: 11.01, theta: -2.43}
+    actions:
+      - "play_three_folder_video"
   
   - name: "31"
     description: "4-extra-6：大零号湾企业介绍"
-    dwell_time: 41
     audio_file: "mp4s/31-companies-0-bay.wav"
     play_audio_when_walking: true
     pose: {x: 8.22, y: 11.95, theta: 1.44}
 
   - name: "32"
     description: "4-extra-7：JAKA机器人公司"
-    dwell_time: 23
     audio_file: "mp4s/32-jaka.wav"
     pose: {x: 8.22, y: 11.95, theta: 1.44}
 
   - name: "33"
     description: "4-extra-8：霖鼎光学公司"
-    dwell_time: 35
     audio_file: "mp4s/33-linding-optics.wav"
     pose: {x: 8.22, y: 11.95, theta: 1.44}
 
   - name: "34"
     description: "4-extra-9：服务地方"
-    dwell_time: 24
     audio_file: "mp4s/34-service-region.wav"
     pose: {x: 14.42, y: 13.88, theta: -1.45}
 
   - name: "35"
     description: "4-extra-10：云南洱海-海菜花"
-    dwell_time: 50
     audio_file: "mp4s/35-yunnan-erhai.wav"
-    pose: {x: 19.09, y: 12.42, theta: 2.19}
+    pose: {x: 19.11, y: 12.73, theta: 2.19}
 
   - name: "36"
     description: "4-extra-11：JAKA机器人舞蹈视频"
-    dwell_time: 25
     audio_file: "mp4s/36-chapter3-jaka-dance-video.wav"
-    pose: {x: 19.09, y: 12.42, theta: 0.15}
+    pose: {x: 19.11, y: 12.73, theta: 0.15}
+    actions:
+      - "play_jaka_arm_dance"
 
   - name: "37"
     description: "4-extra-12：《交大何为》视频"
-    dwell_time: 10
     audio_file: "mp4s/37-sjtu-hewei-video.wav"
     pose: {x: 24.1, y: 14.18, theta: -2.19}
+    actions:
+      - "play_uncharted_territory_video"
   
   - name: "38"
     description: "结束语"
-    dwell_time: 42
     audio_file: "mp4s/38-bye.wav"
     play_audio_when_walking: true
     pose: {x: 30.21, y: 9.87, theta: 0.89}
