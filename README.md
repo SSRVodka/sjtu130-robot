@@ -1,6 +1,33 @@
 
 ## SJTU's 130th Anniversary Celebration: Wenbo Building Exhibition Hall Tour Guide Robot Project
 
+Deploy:
+
+1. copy `agent/config/default.yaml` to `agent/config/robot.yaml` and fill the API keys;
+
+2. modify `museum_tour/waypoints.yaml` and fill your waypoints & actions;
+
+3. execute pack script: `./scripts/pack_for_ohos.sh`;
+
+4. send newest `ohos-deploy-xxx.tar.gz` to OpenHarmony device: `hdc file send ./ohos-deploy-xxx.tar.gz /data`;
+
+5. decompress it on OpenHarmony device and run:
+
+   ```sh
+   mkdir -p /data/sjtu130-robot/
+   mv /data/ohos-deploy-xxx.tar.gz /data/sjtu130-robot
+   cd /data/sjtu130-robot
+   ./script/boot_agent.sh
+   ```
+
+6. (optional) auto boot: modify `/etc/init.cfg` like [`init.cfg.now`](./scripts/init.cfg.now). Add `exec /bin/sh /data/sjtu130-robot/scripts/boot_agent.sh` in `boot` section.
+
+> [!WARNING]
+> 
+> If you write an invalid `/etc/init.cfg`, your OpenHarmony device will never boot again :(
+
+---
+
 Run tests: `python3 -m pytest`
 
 Run chassis mock: `python3 museum_tour/mock_robot_server.py <port>`
